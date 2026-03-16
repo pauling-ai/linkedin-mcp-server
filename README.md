@@ -29,7 +29,7 @@ Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerd
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/jtordable/linkedin-mcp-server
+git clone https://github.com/pauling-ai/linkedin-mcp-server
 cd linkedin-mcp-server
 
 # 2. Install dependencies
