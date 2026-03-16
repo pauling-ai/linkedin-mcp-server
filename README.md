@@ -25,28 +25,55 @@ Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerd
 
 ## Setup
 
-**Prerequisites:** [uv](https://docs.astral.sh/uv/) installed
+**Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/) installed
 
 ```bash
-# 1. Install dependencies
+# 1. Clone the repo
+git clone https://github.com/jtordable/linkedin-mcp-server
+cd linkedin-mcp-server
+
+# 2. Install dependencies
 uv sync
 
-# 2. Install Patchright browser
+# 3. Install Patchright browser
 uv run patchright install chromium
 
-# 3. Log in (first time only)
+# 4. Log in (first time only)
 uv run -m linkedin_mcp_server --login
 ```
 
-This opens a browser for you to log in manually (5 minute timeout for 2FA, captcha, etc.). The browser profile is saved to `~/.linkedin-mcp/profile/`.
+This opens a browser for you to log in manually (5 minute timeout for 2FA, captcha, etc.). The browser profile is saved to `~/.linkedin-mcp/profile/` and persists across sessions.
+
+## Installing into another project
+
+To use this server from another Python project or Claude Code workspace, install it in editable mode pointing at your local clone:
+
+```bash
+# With uv (recommended)
+uv pip install -e /path/to/linkedin-mcp-server
+
+# Or with pip
+pip install -e /path/to/linkedin-mcp-server
+```
+
+Editable mode means changes to the repo are immediately reflected — no reinstall needed.
+
+Then point your MCP config at the installed binary:
+
+```bash
+# Find the installed binary path
+which linkedin-scraper-mcp
+```
 
 ## Claude Code / MCP Configuration
+
+After installing (either in a project venv or globally), add to your `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "linkedin": {
-      "command": "/path/to/linkedin-mcp-server/.venv/bin/linkedin-scraper-mcp",
+      "command": "/path/to/venv/bin/linkedin-scraper-mcp",
       "args": ["--slow-mo", "500"],
       "env": {
         "LOG_LEVEL": "INFO"
@@ -56,18 +83,23 @@ This opens a browser for you to log in manually (5 minute timeout for 2FA, captc
 }
 ```
 
-Or with `uv`:
+Or run directly from the repo with `uv` (no install needed):
 
 ```json
 {
   "mcpServers": {
     "linkedin": {
       "command": "uv",
-      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server"]
+      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server", "--slow-mo", "500"],
+      "env": {
+        "LOG_LEVEL": "INFO"
+      }
     }
   }
 }
 ```
+
+The `uv` approach is the simplest — just update the `--directory` path and you're done.
 
 ## CLI Options
 
