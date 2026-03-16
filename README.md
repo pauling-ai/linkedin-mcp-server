@@ -1,424 +1,62 @@
-# LinkedIn MCP Server
+# LinkedIn MCP Server (Fork)
 
-<p align="left">
-  <a href="https://pypi.org/project/linkedin-scraper-mcp/" target="_blank"><img src="https://img.shields.io/pypi/v/linkedin-scraper-mcp?color=blue" alt="PyPI"></a>
-  <a href="https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml" target="_blank"><img src="https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Status"></a>
-  <a href="https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/release.yml" target="_blank"><img src="https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/release.yml/badge.svg?branch=main" alt="Release"></a>
-  <a href="https://github.com/stickerdaniel/linkedin-mcp-server/blob/main/LICENSE" target="_blank"><img src="https://img.shields.io/badge/License-Apache%202.0-brightgreen?labelColor=32383f" alt="License"></a>
-</p>
+Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerdaniel/linkedin-mcp-server) with additional tools for messaging and post engagement.
 
-Through this LinkedIn MCP server, AI assistants like Claude can connect to your LinkedIn. Access profiles and companies, search for jobs, or get job details.
+## Added Tools
 
-## Installation Methods
+| Tool | Description |
+|------|-------------|
+| `send_message` | Send a LinkedIn message to a 1st-degree connection |
+| `get_post_likers` | Get the list of people who reacted to a LinkedIn post |
 
-[![uvx](https://img.shields.io/badge/uvx-Quick_Install-de5fe9?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDEiIGhlaWdodD0iNDEiIHZpZXdCb3g9IjAgMCA0MSA0MSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTS01LjI4NjE5ZS0wNiAwLjE2ODYyOUwwLjA4NDMwOTggMjAuMTY4NUwwLjE1MTc2MiAzNi4xNjgzQzAuMTYxMDc1IDM4LjM3NzQgMS45NTk0NyA0MC4xNjA3IDQuMTY4NTkgNDAuMTUxNEwyMC4xNjg0IDQwLjA4NEwzMC4xNjg0IDQwLjA0MThMMzEuMTg1MiA0MC4wMzc1QzMzLjM4NzcgNDAuMDI4MiAzNS4xNjgzIDM4LjIwMjYgMzUuMTY4MyAzNlYzNkwzNy4wMDAzIDM2TDM3LjAwMDMgMzkuOTk5Mkw0MC4xNjgzIDM5Ljk5OTZMMzkuOTk5NiAtOS45NDY1M2UtMDdMMjEuNTk5OCAwLjA3NzU2ODlMMjEuNjc3NCAxNi4wMTg1TDIxLjY3NzQgMjUuOTk5OEwyMC4wNzc0IDI1Ljk5OThMMTguMzk5OCAyNS45OTk4TDE4LjQ3NzQgMTYuMDMyTDE4LjM5OTggMC4wOTEwNTkzTC01LjI4NjE5ZS0wNiAwLjE2ODYyOVoiIGZpbGw9IiNERTVGRTkiLz4KPC9zdmc+Cg==)](#-uvx-setup-recommended---universal)
-[![Docker](https://img.shields.io/badge/Docker-Universal_MCP-008fe2?style=for-the-badge&logo=docker&logoColor=008fe2)](#-docker-setup)
-[![Install DXT Extension](https://img.shields.io/badge/Claude_Desktop_DXT-d97757?style=for-the-badge&logo=anthropic)](#-claude-desktop-dxt-extension)
-[![Development](https://img.shields.io/badge/Development-Local-ffdc53?style=for-the-badge&logo=python&logoColor=ffdc53)](#-local-setup-develop--contribute)
+## All Tools
 
-<https://github.com/user-attachments/assets/eb84419a-6eaf-47bd-ac52-37bc59c83680>
+| Tool | Description |
+|------|-------------|
+| `get_person_profile` | Get profile info with optional section selection (experience, education, interests, honors, languages, contact_info, posts) |
+| `get_company_profile` | Extract company information with optional section selection (posts, jobs) |
+| `get_company_posts` | Get recent posts from a company's LinkedIn feed |
+| `search_people` | Search for people by keywords and location |
+| `search_jobs` | Search for jobs with keywords and location filters |
+| `get_job_details` | Get detailed information about a specific job posting |
+| `get_post_likers` | Get the list of people who reacted to a LinkedIn post |
+| `send_message` | Send a LinkedIn message to a 1st-degree connection |
+| `close_session` | Close browser session and clean up resources |
 
-## Usage Examples
+## Setup
 
-```
-Research the background of this candidate https://www.linkedin.com/in/stickerdaniel/
-```
-
-```
-Get this company profile for partnership discussions https://www.linkedin.com/company/inframs/
-```
-
-```
-Suggest improvements for my CV to target this job posting https://www.linkedin.com/jobs/view/4252026496
-```
-
-```
-What has Anthropic been posting about recently? https://www.linkedin.com/company/anthropicresearch/
-```
-
-## Features & Tool Status
-
-| Tool | Description | Status |
-|------|-------------|--------|
-| `get_person_profile` | Get profile info with explicit section selection (experience, education, interests, honors, languages, contact_info, posts) | Working |
-| `get_company_profile` | Extract company information with explicit section selection (posts, jobs) | Working |
-| `get_company_posts` | Get recent posts from a company's LinkedIn feed | Working |
-| `search_jobs` | Search for jobs with keywords and location filters | Working |
-| `search_people` | Search for people by keywords and location | Working |
-| `get_job_details` | Get detailed information about a specific job posting | Working |
-| `close_session` | Close browser session and clean up resources | Working |
-
-Tool responses keep readable `sections` text and may also include a compact `references` map keyed by section. Each reference includes a typed target, a relative LinkedIn path (or absolute external URL), and a short label/context when available.
-
-When one section fails but the overall tool call still completes, responses may also include `section_errors`. Each entry contains structured diagnostics for that section, including the error type/message, a compact runtime summary, trace/log locations, matching-open-issue hints when available, and the path to a generated issue-ready markdown report with the full session details.
-
-> [!IMPORTANT]
-> **Breaking change:** LinkedIn recently made some changes to prevent scraping. The newest version uses [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python) with persistent browser profiles instead of Playwright with session files. Old `session.json` files and `LINKEDIN_COOKIE` env vars are no longer supported. Run `--login` again to create a new profile + cookie file that can be mounted in docker. 02/2026
-
-<br/>
-<br/>
-
-## 🚀 uvx Setup (Recommended - Universal)
-
-**Prerequisites:** [Install uv](https://docs.astral.sh/uv/getting-started/installation/) and run `uvx patchright install chromium` to set up the browser.
-
-### Installation
-
-**Step 1: Create a session (first time only)**
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) installed
 
 ```bash
-uvx linkedin-scraper-mcp --login
+# 1. Install dependencies
+uv sync
+
+# 2. Install Patchright browser
+uv run patchright install chromium
+
+# 3. Log in (first time only)
+uv run -m linkedin_mcp_server --login
 ```
 
 This opens a browser for you to log in manually (5 minute timeout for 2FA, captcha, etc.). The browser profile is saved to `~/.linkedin-mcp/profile/`.
 
-**Step 2: Client Configuration:**
+## Claude Code / MCP Configuration
 
 ```json
 {
   "mcpServers": {
     "linkedin": {
-      "command": "uvx",
-      "args": ["linkedin-scraper-mcp"]
+      "command": "/path/to/linkedin-mcp-server/.venv/bin/linkedin-scraper-mcp",
+      "args": ["--slow-mo", "500"],
+      "env": {
+        "LOG_LEVEL": "INFO"
+      }
     }
   }
 }
 ```
 
-> [!NOTE]
-> Sessions may expire over time. If you encounter authentication issues, run `uvx linkedin-scraper-mcp --login` again
-
-### uvx Setup Help
-
-<details>
-<summary><b>🔧 Configuration</b></summary>
-
-**Transport Modes:**
-
-- **Default (stdio)**: Standard communication for local MCP servers
-- **Streamable HTTP**: For web-based MCP server
-- If no transport is specified, the server defaults to `stdio`
-- An interactive terminal without explicit transport shows a chooser prompt
-
-**CLI Options:**
-
-- `--login` - Open browser to log in and save persistent profile
-- `--no-headless` - Show browser window (useful for debugging scraping issues)
-- `--log-level {DEBUG,INFO,WARNING,ERROR}` - Set logging level (default: WARNING)
-- `--transport {stdio,streamable-http}` - Optional: force transport mode (default: stdio)
-- `--host HOST` - HTTP server host (default: 127.0.0.1)
-- `--port PORT` - HTTP server port (default: 8000)
-- `--path PATH` - HTTP server path (default: /mcp)
-- `--logout` - Clear stored LinkedIn browser profile
-- `--timeout MS` - Browser timeout for page operations in milliseconds (default: 5000)
-- `--user-data-dir PATH` - Path to persistent browser profile directory (default: ~/.linkedin-mcp/profile)
-- `--chrome-path PATH` - Path to Chrome/Chromium executable (for custom browser installations)
-
-**Basic Usage Examples:**
-
-```bash
-# Create a session interactively
-uvx linkedin-scraper-mcp --login
-
-# Run with debug logging
-uvx linkedin-scraper-mcp --log-level DEBUG
-```
-
-**HTTP Mode Example (for web-based MCP clients):**
-
-```bash
-uvx linkedin-scraper-mcp --transport streamable-http --host 127.0.0.1 --port 8080 --path /mcp
-```
-
-Runtime server logs are emitted by FastMCP/Uvicorn.
-
-Tool calls are serialized within a single server process to protect the shared
-LinkedIn browser session. Concurrent client requests queue instead of running in
-parallel. Use `--log-level DEBUG` to see scraper lock wait/acquire/release logs.
-
-**Test with mcp inspector:**
-
-1. Install and run mcp inspector ```bunx @modelcontextprotocol/inspector```
-2. Click pre-filled token url to open the inspector in your browser
-3. Select `Streamable HTTP` as `Transport Type`
-4. Set `URL` to `http://localhost:8080/mcp`
-5. Connect
-6. Test tools
-
-</details>
-
-<details>
-<summary><b>❗ Troubleshooting</b></summary>
-
-**Installation issues:**
-
-- Ensure you have uv installed: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Check uv version: `uv --version` (should be 0.4.0 or higher)
-
-**Session issues:**
-
-- Browser profile is stored at `~/.linkedin-mcp/profile/`
-- Make sure you have only one active LinkedIn session at a time
-
-**Login issues:**
-
-- LinkedIn may require a login confirmation in the LinkedIn mobile app for `--login`
-- You might get a captcha challenge if you logged in frequently. Run `uvx linkedin-scraper-mcp --login` which opens a browser where you can solve it manually.
-
-**Timeout issues:**
-
-- If pages fail to load or elements aren't found, try increasing the timeout: `--timeout 10000`
-- Users on slow connections may need higher values (e.g., 15000-30000ms)
-- Can also set via environment variable: `TIMEOUT=10000`
-
-**Custom Chrome path:**
-
-- If Chrome is installed in a non-standard location, use `--chrome-path /path/to/chrome`
-- Can also set via environment variable: `CHROME_PATH=/path/to/chrome`
-
-</details>
-
-<br/>
-<br/>
-
-## 🐳 Docker Setup
-
-**Prerequisites:** Make sure you have [Docker](https://www.docker.com/get-started/) installed and running.
-
-### Authentication
-
-Docker runs headless (no browser window), so you need to create a browser profile locally first and mount it into the container.
-
-**Step 1: Create profile on the host (one-time setup)**
-
-```bash
-uvx linkedin-scraper-mcp --login
-```
-
-This opens a browser window where you log in manually (5 minute timeout for 2FA, captcha, etc.). The browser profile and cookies are saved under `~/.linkedin-mcp/`. On startup, Docker derives a Linux browser profile from your host cookies and creates a fresh session each time. If you experience stability issues with Docker, consider using the [uvx setup](#-uvx-setup-recommended---universal) instead.
-
-**Step 2: Configure Claude Desktop with Docker**
-
-```json
-{
-  "mcpServers": {
-    "linkedin": {
-      "command": "docker",
-      "args": [
-        "run", "--rm", "-i",
-        "-v", "~/.linkedin-mcp:/home/pwuser/.linkedin-mcp",
-        "stickerdaniel/linkedin-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-> [!NOTE]
-> Docker creates a fresh session on each startup. Sessions may expire over time — run `uvx linkedin-scraper-mcp --login` again if you encounter authentication issues.
-
-> [!NOTE]
-> **Why can't I run `--login` in Docker?** Docker containers don't have a display server. Create a profile on your host using the [uvx setup](#-uvx-setup-recommended---universal) and mount it into Docker.
-
-### Docker Setup Help
-
-<details>
-<summary><b>🔧 Configuration</b></summary>
-
-**Transport Modes:**
-
-- **Default (stdio)**: Standard communication for local MCP servers
-- **Streamable HTTP**: For a web-based MCP server
-- If no transport is specified, the server defaults to `stdio`
-- An interactive terminal without explicit transport shows a chooser prompt
-
-**CLI Options:**
-
-- `--log-level {DEBUG,INFO,WARNING,ERROR}` - Set logging level (default: WARNING)
-- `--transport {stdio,streamable-http}` - Optional: force transport mode (default: stdio)
-- `--host HOST` - HTTP server host (default: 127.0.0.1)
-- `--port PORT` - HTTP server port (default: 8000)
-- `--path PATH` - HTTP server path (default: /mcp)
-- `--logout` - Clear all stored LinkedIn auth state, including source and derived runtime profiles
-- `--timeout MS` - Browser timeout for page operations in milliseconds (default: 5000)
-- `--user-data-dir PATH` - Path to persistent browser profile directory (default: ~/.linkedin-mcp/profile)
-- `--chrome-path PATH` - Path to Chrome/Chromium executable (rarely needed in Docker)
-
-> [!NOTE]
-> `--login` and `--no-headless` are not available in Docker (no display server). Use the [uvx setup](#-uvx-setup-recommended---universal) to create profiles.
-
-**HTTP Mode Example (for web-based MCP clients):**
-
-```bash
-docker run -it --rm \
-  -v ~/.linkedin-mcp:/home/pwuser/.linkedin-mcp \
-  -p 8080:8080 \
-  stickerdaniel/linkedin-mcp-server:latest \
-  --transport streamable-http --host 0.0.0.0 --port 8080 --path /mcp
-```
-
-Runtime server logs are emitted by FastMCP/Uvicorn.
-
-**Test with mcp inspector:**
-
-1. Install and run mcp inspector ```bunx @modelcontextprotocol/inspector```
-2. Click pre-filled token url to open the inspector in your browser
-3. Select `Streamable HTTP` as `Transport Type`
-4. Set `URL` to `http://localhost:8080/mcp`
-5. Connect
-6. Test tools
-
-</details>
-
-<details>
-<summary><b>❗ Troubleshooting</b></summary>
-
-**Docker issues:**
-
-- Make sure [Docker](https://www.docker.com/get-started/) is installed
-- Check if Docker is running: `docker ps`
-
-**Login issues:**
-
-- Make sure you have only one active LinkedIn session at a time
-- LinkedIn may require a login confirmation in the LinkedIn mobile app for `--login`
-- You might get a captcha challenge if you logged in frequently. Run `uvx linkedin-scraper-mcp --login` which opens a browser where you can solve captchas manually. See the [uvx setup](#-uvx-setup-recommended---universal) for prerequisites.
-- If Docker auth becomes stale after you re-login on the host, restart Docker once so it can fresh-bridge from the new source session generation.
-
-**Timeout issues:**
-
-- If pages fail to load or elements aren't found, try increasing the timeout: `--timeout 10000`
-- Users on slow connections may need higher values (e.g., 15000-30000ms)
-- Can also set via environment variable: `TIMEOUT=10000`
-
-**Custom Chrome path:**
-
-- If Chrome is installed in a non-standard location, use `--chrome-path /path/to/chrome`
-- Can also set via environment variable: `CHROME_PATH=/path/to/chrome`
-
-</details>
-
-<br/>
-<br/>
-
-## 📦 Claude Desktop (DXT Extension)
-
-**Prerequisites:** [Claude Desktop](https://claude.ai/download) and [Docker](https://www.docker.com/get-started/) installed & running
-
-**One-click installation** for Claude Desktop users:
-
-1. Download the [DXT extension](https://github.com/stickerdaniel/linkedin-mcp-server/releases/latest)
-2. Double-click to install into Claude Desktop
-3. Create a session: `uvx linkedin-scraper-mcp --login`
-
-> [!NOTE]
-> Sessions may expire over time. If you encounter authentication issues, run `uvx linkedin-scraper-mcp --login` again.
-
-### DXT Extension Setup Help
-
-<details>
-<summary><b>❗ Troubleshooting</b></summary>
-
-**First-time setup timeout:**
-
-- Claude Desktop has a ~60 second connection timeout
-- If the Docker image isn't cached, the pull may exceed this timeout
-- **Fix:** Pre-pull the image before first use:
-
-  ```bash
-  docker pull stickerdaniel/linkedin-mcp-server:2.3.0
-  ```
-
-- Then restart Claude Desktop
-
-**Docker issues:**
-
-- Make sure [Docker](https://www.docker.com/get-started/) is installed
-- Check if Docker is running: `docker ps`
-
-**Login issues:**
-
-- Make sure you have only one active LinkedIn session at a time
-- LinkedIn may require a login confirmation in the LinkedIn mobile app for `--login`
-- You might get a captcha challenge if you logged in frequently. Run `uvx linkedin-scraper-mcp --login` which opens a browser where you can solve captchas manually. See the [uvx setup](#-uvx-setup-recommended---universal) for prerequisites.
-
-**Timeout issues:**
-
-- If pages fail to load or elements aren't found, try increasing the timeout: `--timeout 10000`
-- Users on slow connections may need higher values (e.g., 15000-30000ms)
-- Can also set via environment variable: `TIMEOUT=10000`
-
-</details>
-
-<br/>
-<br/>
-
-## 🐍 Local Setup (Develop & Contribute)
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture guidelines and checklists. Please [open an issue](https://github.com/stickerdaniel/linkedin-mcp-server/issues) first to discuss the feature or bug fix before submitting a PR.
-
-**Prerequisites:** [Git](https://git-scm.com/downloads) and [uv](https://docs.astral.sh/uv/) installed
-
-### Installation
-
-```bash
-# 1. Clone repository
-git clone https://github.com/stickerdaniel/linkedin-mcp-server
-cd linkedin-mcp-server
-
-# 2. Install UV package manager (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 3. Install dependencies
-uv sync
-uv sync --group dev
-
-# 4. Install Patchright browser
-uv run patchright install chromium
-
-# 5. Install pre-commit hooks
-uv run pre-commit install
-
-# 6. Create a session (first time only)
-uv run -m linkedin_mcp_server --login
-
-# 7. Start the server
-uv run -m linkedin_mcp_server
-```
-
-### Local Setup Help
-
-<details>
-<summary><b>🔧 Configuration</b></summary>
-
-**CLI Options:**
-
-- `--login` - Open browser to log in and save persistent profile
-- `--no-headless` - Show browser window (useful for debugging scraping issues)
-- `--log-level {DEBUG,INFO,WARNING,ERROR}` - Set logging level (default: WARNING)
-- `--transport {stdio,streamable-http}` - Optional: force transport mode (default: stdio)
-- `--host HOST` - HTTP server host (default: 127.0.0.1)
-- `--port PORT` - HTTP server port (default: 8000)
-- `--path PATH` - HTTP server path (default: /mcp)
-- `--logout` - Clear stored LinkedIn browser profile
-- `--timeout MS` - Browser timeout for page operations in milliseconds (default: 5000)
-- `--status` - Check if current session is valid and exit
-- `--user-data-dir PATH` - Path to persistent browser profile directory (default: ~/.linkedin-mcp/profile)
-- `--slow-mo MS` - Delay between browser actions in milliseconds (default: 0, useful for debugging)
-- `--user-agent STRING` - Custom browser user agent
-- `--viewport WxH` - Browser viewport size (default: 1280x720)
-- `--chrome-path PATH` - Path to Chrome/Chromium executable (for custom browser installations)
-- `--help` - Show help
-
-> **Note:** Most CLI options have environment variable equivalents. See `.env.example` for details.
-
-**HTTP Mode Example (for web-based MCP clients):**
-
-```bash
-uv run -m linkedin_mcp_server --transport streamable-http --host 127.0.0.1 --port 8000 --path /mcp
-```
-
-**Claude Desktop:**
+Or with `uv`:
 
 ```json
 {
@@ -431,60 +69,35 @@ uv run -m linkedin_mcp_server --transport streamable-http --host 127.0.0.1 --por
 }
 ```
 
-`stdio` is used by default for this config.
+## CLI Options
 
-</details>
+- `--login` - Open browser to log in and save persistent profile
+- `--logout` - Clear stored LinkedIn browser profile
+- `--status` - Check if current session is valid and exit
+- `--no-headless` - Show browser window (useful for debugging)
+- `--slow-mo MS` - Delay between browser actions in ms (default: 0)
+- `--log-level {DEBUG,INFO,WARNING,ERROR}` - Logging level (default: WARNING)
+- `--timeout MS` - Browser timeout for page operations in ms (default: 5000)
+- `--transport {stdio,streamable-http}` - Transport mode (default: stdio)
 
-<details>
-<summary><b>❗ Troubleshooting</b></summary>
+## Troubleshooting
 
-**Login issues:**
+**Session expired:** Run `uv run -m linkedin_mcp_server --login` again.
 
-- Make sure you have only one active LinkedIn session at a time
-- LinkedIn may require a login confirmation in the LinkedIn mobile app for `--login`
-- You might get a captcha challenge if you logged in frequently. The `--login` command opens a browser where you can solve it manually.
+**Login issues:** LinkedIn may require confirmation in the mobile app, or show a captcha — the `--login` browser window lets you handle these manually.
 
-**Scraping issues:**
+**Scraping issues:** Use `--no-headless` to watch the browser and `--log-level DEBUG` for detailed logs.
 
-- Use `--no-headless` to see browser actions and debug scraping problems
-- Add `--log-level DEBUG` to see more detailed logging
+**Timeout issues:** Increase with `--timeout 10000` or env var `TIMEOUT=10000`.
 
-**Session issues:**
+**`send_message` not finding the Message button:** The target user must be a 1st-degree connection. The tool will return an error with diagnostic info if the button isn't found.
 
-- Browser profile is stored at `~/.linkedin-mcp/profile/`
-- Use `--logout` to clear the profile and start fresh
+## Notes
 
-**Python/Patchright issues:**
-
-- Check Python version: `python --version` (should be 3.12+)
-- Reinstall Patchright: `uv run patchright install chromium`
-- Reinstall dependencies: `uv sync --reinstall`
-
-**Timeout issues:**
-
-- If pages fail to load or elements aren't found, try increasing the timeout: `--timeout 10000`
-- Users on slow connections may need higher values (e.g., 15000-30000ms)
-- Can also set via environment variable: `TIMEOUT=10000`
-
-**Custom Chrome path:**
-
-- If Chrome is installed in a non-standard location, use `--chrome-path /path/to/chrome`
-- Can also set via environment variable: `CHROME_PATH=/path/to/chrome`
-
-</details>
-
-
-<br/>
-<br/>
-
-## Acknowledgements
-
-Built with [FastMCP](https://gofastmcp.com/) and [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python).
-
-Use in accordance with [LinkedIn's Terms of Service](https://www.linkedin.com/legal/user-agreement). Web scraping may violate LinkedIn's terms. This tool is for personal use only.
+- Browser profile stored at `~/.linkedin-mcp/profile/`
+- Tool calls are serialized — concurrent requests queue rather than run in parallel
+- Use in accordance with [LinkedIn's Terms of Service](https://www.linkedin.com/legal/user-agreement)
 
 ## License
 
-This project is licensed under the Apache 2.0 license.
-
-<br>
+Apache 2.0 — see [LICENSE](LICENSE)
