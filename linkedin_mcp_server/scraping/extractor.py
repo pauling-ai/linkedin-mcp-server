@@ -666,6 +666,101 @@ class LinkedInExtractor:
             result["section_errors"] = section_errors
         return result
 
+    async def scrape_post_likers(self, post_url: str) -> dict[str, Any]:
+        """Navigate to a post, open the reactions modal, and extract likers.
+
+        Clicks the reactions count button to open the likers modal, scrolls
+        through all likers, and extracts names and profile URLs.
+
+        Returns:
+            {url, likers: [{name, username, url}], count}
+        """
+        await self._goto_with_auth_checks(post_url)
+
+        # Wait for the reactions count button to appear
+        reactions_selector = (
+            "button.social-details-social-counts__reactions-count, "
+            ".social-details-social-counts__reactions-count"
+        )
+        try:
+            await self._page.wait_for_selector(reactions_selector, timeout=10000)
+        except PlaywrightTimeoutError:
+            logger.debug("No reactions button found on %s", post_url)
+            return {"url": post_url, "likers": [], "count": 0, "error": "No reactions found on this post"}
+
+        # Click the reactions button to open the likers modal
+        try:
+            btn = self._page.locator(reactions_selector).first
+            await btn.click()
+        except Exception as e:
+            logger.warning("Could not click reactions button on %s: %s", post_url, e)
+            return {"url": post_url, "likers": [], "count": 0, "error": "Could not open reactions modal"}
+
+        # Wait for the modal to open
+        modal_selector = "dialog[open], .artdeco-modal__content"
+        try:
+            await self._page.wait_for_selector(modal_selector, timeout=8000)
+        except PlaywrightTimeoutError:
+            logger.debug("Reactions modal did not open on %s", post_url)
+            return {"url": post_url, "likers": [], "count": 0, "error": "Reactions modal did not open"}
+
+        # Scroll the modal to load all likers
+        await self._page.evaluate(
+            """async ({pauseTime, maxScrolls}) => {
+                const modal = document.querySelector(
+                    'dialog[open] .artdeco-modal__artdeco-modal__content, '
+                    + '.artdeco-modal__content, dialog[open]'
+                );
+                if (!modal) return;
+                for (let i = 0; i < maxScrolls; i++) {
+                    const prev = modal.scrollHeight;
+                    modal.scrollTop = modal.scrollHeight;
+                    await new Promise(r => setTimeout(r, pauseTime * 1000));
+                    if (modal.scrollHeight === prev) break;
+                }
+            }""",
+            {"pauseTime": 1.0, "maxScrolls": 20},
+        )
+
+        # Extract liker names and profile URLs from the modal
+        likers = await self._page.evaluate(
+            """() => {
+                const modal = document.querySelector(
+                    '.artdeco-modal__content, dialog[open]'
+                );
+                if (!modal) return [];
+
+                const results = [];
+                const seen = new Set();
+
+                const links = modal.querySelectorAll('a[href*="/in/"]');
+                links.forEach(link => {
+                    const href = link.getAttribute('href') || '';
+                    const match = href.match(/\\/in\\/([^/?#]+)/);
+                    if (!match) return;
+                    const username = match[1];
+                    if (seen.has(username)) return;
+                    seen.add(username);
+
+                    const name = (link.innerText || link.textContent || '').trim();
+                    if (name) {
+                        results.push({
+                            name: name,
+                            username: username,
+                            url: 'https://www.linkedin.com/in/' + username + '/'
+                        });
+                    }
+                });
+                return results;
+            }"""
+        )
+
+        return {
+            "url": post_url,
+            "likers": likers,
+            "count": len(likers),
+        }
+
     async def scrape_job(self, job_id: str) -> dict[str, Any]:
         """Scrape a single job posting.
 
