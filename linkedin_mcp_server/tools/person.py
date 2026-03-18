@@ -354,3 +354,78 @@ def register_person_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("send_connection_request: unhandled exception for %s", linkedin_username)
             raise_tool_error(e, "send_connection_request")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Follow Person",
+        annotations={"openWorldHint": True},
+        tags={"person", "connections"},
+    )
+    async def follow_person(
+        linkedin_username: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Follow a LinkedIn person's profile.
+
+        Args:
+            linkedin_username: LinkedIn username (e.g., "jtordable", "williamhgates")
+
+        Returns:
+            Dict with status and profile_url.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to profile")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
+            logger.info("follow_person: navigating to %s", profile_url)
+            await page.goto(profile_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.5)
+
+            await ctx.report_progress(progress=40, total=100, message="Looking for Follow button")
+
+            # On creator/influencer profiles Follow is the primary CTA; nth(1) skips the sticky header
+            follow_btn = page.locator("button.artdeco-button--primary").filter(has_text="Follow").nth(1)
+            btn_count = await follow_btn.count()
+
+            if not btn_count:
+                # On regular profiles Follow is inside the "More" dropdown
+                more_btn = page.locator("button").filter(has_text="More").nth(1)
+                if await more_btn.count():
+                    await more_btn.click()
+                    await asyncio.sleep(1.0)
+                    follow_btn = page.get_by_role("menuitem", name="Follow", exact=True).first
+                    btn_count = await follow_btn.count()
+
+            if not btn_count:
+                body_text = await page.evaluate("() => document.body?.innerText || ''")
+                logger.warning(
+                    "follow_person: no Follow button on %s body_snippet=%r",
+                    profile_url,
+                    " ".join(body_text.split())[:300],
+                )
+                return {
+                    "status": "error",
+                    "error": "Follow button not found. You may already follow this person.",
+                    "profile_url": profile_url,
+                }
+
+            await follow_btn.click()
+            logger.info("follow_person: clicked Follow button for %s", linkedin_username)
+            await asyncio.sleep(1.0)
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            return {
+                "status": "success",
+                "recipient": linkedin_username,
+                "profile_url": profile_url,
+            }
+
+        except Exception as e:
+            logger.exception("follow_person: unhandled exception for %s", linkedin_username)
+            raise_tool_error(e, "follow_person")  # NoReturn
