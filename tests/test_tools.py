@@ -563,6 +563,7 @@ class TestFollowPerson:
     def _make_page_mock(
         self,
         primary_follow_count=1,
+        aria_follow_count=0,
         more_btn_count=0,
         menuitem_follow_count=0,
     ):
@@ -582,6 +583,7 @@ class TestFollowPerson:
             return loc
 
         primary_follow_btn = make_btn(primary_follow_count)
+        aria_follow_btn = make_btn(aria_follow_count)
         more_btn = make_btn(more_btn_count)
         menu_follow_btn = make_btn(menuitem_follow_count)
         no_btn = make_btn(0)
@@ -592,19 +594,21 @@ class TestFollowPerson:
                 loc.filter.return_value.nth.return_value = primary_follow_btn
             elif selector == "button":
                 loc.filter.return_value.nth.return_value = more_btn
+            elif "aria-label^='Follow '" in selector:
+                loc.first = aria_follow_btn
             else:
-                loc.filter.return_value.nth.return_value = no_btn
                 loc.first = no_btn
+                loc.nth.return_value = no_btn
             return loc
 
         mock_page.locator = MagicMock(side_effect=locator_side_effect)
         mock_page.get_by_role = MagicMock(
             side_effect=lambda role, **kw: wrap(menu_follow_btn) if kw.get("name") == "Follow" else wrap(no_btn)
         )
-        return mock_page, primary_follow_btn, more_btn, menu_follow_btn
+        return mock_page, primary_follow_btn, aria_follow_btn, more_btn, menu_follow_btn
 
     async def test_follow_person_primary_button(self, mock_context):
-        mock_page, primary_follow_btn, _, _ = self._make_page_mock()
+        mock_page, primary_follow_btn, _, _, _ = self._make_page_mock()
         mock_browser = MagicMock()
         mock_browser.page = mock_page
         mock_extractor = MagicMock()
@@ -631,7 +635,7 @@ class TestFollowPerson:
         primary_follow_btn.click.assert_awaited_once()
 
     async def test_follow_person_via_more_dropdown(self, mock_context):
-        mock_page, _, more_btn, menu_follow_btn = self._make_page_mock(
+        mock_page, _, _, more_btn, menu_follow_btn = self._make_page_mock(
             primary_follow_count=0,
             more_btn_count=1,
             menuitem_follow_count=1,
@@ -660,8 +664,35 @@ class TestFollowPerson:
         more_btn.click.assert_awaited_once()
         menu_follow_btn.click.assert_awaited_once()
 
+    async def test_follow_person_via_aria_label(self, mock_context):
+        mock_page, _, aria_follow_btn, _, _ = self._make_page_mock(
+            primary_follow_count=0, aria_follow_count=1
+        )
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "follow_person")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "success"
+        aria_follow_btn.click.assert_awaited_once()
+
     async def test_follow_person_button_not_found(self, mock_context):
-        mock_page, _, _, _ = self._make_page_mock(primary_follow_count=0, more_btn_count=0)
+        mock_page, _, _, _, _ = self._make_page_mock(primary_follow_count=0, more_btn_count=0)
         mock_browser = MagicMock()
         mock_browser.page = mock_page
         mock_extractor = MagicMock()
@@ -961,6 +992,7 @@ class TestCheckFollow:
                 loc.filter.return_value.nth.return_value = more_btn
             else:
                 # aria-label selectors — return count=0 by default so tests fall through
+                loc.first = no_btn
                 loc.nth.return_value = no_btn
             return loc
 
@@ -1090,13 +1122,13 @@ class TestCheckFollow:
         original_locator = mock_page.locator.side_effect
 
         def locator_with_aria(selector):
-            if selector == "button[aria-label^='Following']":
+            if "aria-label^='Following'" in selector:
                 loc = MagicMock()
-                loc.nth.return_value = following_aria
+                loc.first = following_aria
                 return loc
-            if selector == "button[aria-label^='Follow ']":
+            if "aria-label^='Follow '" in selector:
                 loc = MagicMock()
-                loc.nth.return_value = follow_aria
+                loc.first = follow_aria
                 return loc
             return original_locator(selector)
 
@@ -1124,7 +1156,7 @@ class TestCheckFollow:
         assert result["following"] is True
 
     async def test_not_following_via_aria_label(self, mock_context):
-        """Icon-only button: aria-label='Follow David Van Der Spoel' with no visible text."""
+        """Secondary button: aria-label='Follow David Van Der Spoel', excluded from sticky header."""
         mock_page, _, _, _, _, _ = self._make_page_mock()  # has_text counts all 0
 
         following_aria = MagicMock()
@@ -1135,13 +1167,13 @@ class TestCheckFollow:
         original_locator = mock_page.locator.side_effect
 
         def locator_with_aria(selector):
-            if selector == "button[aria-label^='Following']":
+            if "aria-label^='Following'" in selector:
                 loc = MagicMock()
-                loc.nth.return_value = following_aria
+                loc.first = following_aria
                 return loc
-            if selector == "button[aria-label^='Follow ']":
+            if "aria-label^='Follow '" in selector:
                 loc = MagicMock()
-                loc.nth.return_value = follow_aria
+                loc.first = follow_aria
                 return loc
             return original_locator(selector)
 

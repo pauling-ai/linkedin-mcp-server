@@ -389,9 +389,18 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=40, total=100, message="Looking for Follow button")
 
-            # On creator/influencer profiles Follow is the primary CTA; nth(1) skips the sticky header
+            # On creator/influencer profiles Follow is the primary CTA; nth(1) skips the sticky header.
+            # Also check aria-label for icon-only buttons (e.g. aria-label="Follow David Van Der Spoel").
             follow_btn = page.locator("button.artdeco-button--primary").filter(has_text="Follow").nth(1)
             btn_count = await follow_btn.count()
+
+            if not btn_count:
+                # Fallback: secondary or icon-only button — match by aria-label, skip sticky header copy.
+                # The sticky header duplicate always carries pvs-sticky-header-profile-actions__action.
+                follow_btn = page.locator(
+                    "button[aria-label^='Follow ']:not(.pvs-sticky-header-profile-actions__action)"
+                ).first
+                btn_count = await follow_btn.count()
 
             if not btn_count:
                 # On regular profiles Follow is inside the "More" dropdown
@@ -476,12 +485,17 @@ def register_person_tools(mcp: FastMCP) -> None:
                 await ctx.report_progress(progress=100, total=100, message="Complete")
                 return {"following": False, "profile_url": profile_url}
 
-            # aria-label fallback: "Following" (exact) or "Follow <Name>" (starts with "Follow ")
-            if await page.locator("button[aria-label^='Following']").nth(1).count():
+            # aria-label fallback (secondary / icon-only buttons), excluding sticky header copy.
+            # The sticky header duplicate always carries pvs-sticky-header-profile-actions__action.
+            if await page.locator(
+                "button[aria-label^='Following']:not(.pvs-sticky-header-profile-actions__action)"
+            ).first.count():
                 await ctx.report_progress(progress=100, total=100, message="Complete")
                 return {"following": True, "profile_url": profile_url}
 
-            if await page.locator("button[aria-label^='Follow ']").nth(1).count():
+            if await page.locator(
+                "button[aria-label^='Follow ']:not(.pvs-sticky-header-profile-actions__action)"
+            ).first.count():
                 await ctx.report_progress(progress=100, total=100, message="Complete")
                 return {"following": False, "profile_url": profile_url}
 
