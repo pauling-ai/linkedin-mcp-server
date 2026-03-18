@@ -241,3 +241,116 @@ def register_person_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("send_message: unhandled exception for %s", linkedin_username)
             raise_tool_error(e, "send_message")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Send Connection Request",
+        annotations={"openWorldHint": True},
+        tags={"person", "connections"},
+    )
+    async def send_connection_request(
+        linkedin_username: str,
+        ctx: Context,
+        message: str | None = None,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Send a LinkedIn connection request to a person.
+
+        Args:
+            linkedin_username: LinkedIn username (e.g., "jtordable", "williamhgates")
+            message: Optional note to include with the request (max ~300 chars).
+                     If omitted, sends without a note.
+
+        Returns:
+            Dict with status, recipient, and optionally message_preview.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to profile")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
+            logger.info("send_connection_request: navigating to %s", profile_url)
+            await page.goto(profile_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.5)
+
+            await ctx.report_progress(progress=30, total=100, message="Looking for Connect button")
+
+            # Connect button is primary on most profiles; nth(1) skips the hidden sticky header
+            connect_btn = page.locator("button.artdeco-button--primary").filter(has_text="Connect").nth(1)
+            btn_count = await connect_btn.count()
+
+            if not btn_count:
+                # Some profiles (e.g. Follow as primary) bury Connect inside a "More" dropdown
+                more_btn = (
+                    page.locator("button").filter(has_text="More").nth(1)
+                )
+                if await more_btn.count():
+                    await more_btn.click()
+                    await asyncio.sleep(1.0)
+                    connect_btn = page.get_by_role("menuitem", name="Connect", exact=True).first
+                    btn_count = await connect_btn.count()
+
+            if not btn_count:
+                body_text = await page.evaluate("() => document.body?.innerText || ''")
+                logger.warning(
+                    "send_connection_request: no Connect button on %s body_snippet=%r",
+                    profile_url,
+                    " ".join(body_text.split())[:300],
+                )
+                return {
+                    "status": "error",
+                    "error": "Connect button not found. User may already be a connection, have a pending request, or not allow connection requests.",
+                    "profile_url": profile_url,
+                }
+
+            await connect_btn.click()
+            logger.info("send_connection_request: clicked Connect button")
+            await asyncio.sleep(1.5)
+
+            await ctx.report_progress(progress=60, total=100, message="Handling connection modal")
+
+            if message:
+                # Click "Add a note" to open the note textarea
+                add_note_btn = page.get_by_role("button", name="Add a note", exact=True).first
+                if await add_note_btn.count():
+                    await add_note_btn.click()
+                    await asyncio.sleep(1.0)
+
+                    note_box = page.locator("textarea[name='message']").first
+                    await note_box.wait_for(state="visible", timeout=5000)
+                    await note_box.click()
+                    await page.keyboard.type(message[:300], delay=20)
+                    await asyncio.sleep(0.5)
+                    logger.info("send_connection_request: note typed")
+                else:
+                    logger.warning("send_connection_request: 'Add a note' button not found, sending without note")
+
+                await ctx.report_progress(progress=85, total=100, message="Sending")
+                send_btn = page.get_by_role("button", name="Send", exact=True).first
+            else:
+                await ctx.report_progress(progress=85, total=100, message="Sending without note")
+                send_btn = page.get_by_role("button", name="Send without a note", exact=True).first
+                if not await send_btn.count():
+                    send_btn = page.get_by_role("button", name="Send", exact=True).first
+
+            await send_btn.click()
+            await asyncio.sleep(1.5)
+            logger.info("send_connection_request: sent to %s", linkedin_username)
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            result: dict[str, Any] = {
+                "status": "success",
+                "recipient": linkedin_username,
+                "profile_url": profile_url,
+            }
+            if message:
+                result["message_preview"] = message[:120] + ("…" if len(message) > 120 else "")
+            return result
+
+        except Exception as e:
+            logger.exception("send_connection_request: unhandled exception for %s", linkedin_username)
+            raise_tool_error(e, "send_connection_request")  # NoReturn

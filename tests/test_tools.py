@@ -378,6 +378,187 @@ class TestFollowCompany:
         assert "Follow button not found" in result["error"]
 
 
+class TestSendConnectionRequest:
+    def _make_page_mock(
+        self,
+        connect_btn_count=1,
+        more_btn_count=0,
+        menuitem_connect_count=0,
+        add_note_count=1,
+        send_btn_count=1,
+    ):
+        mock_page = MagicMock()
+        mock_page.goto = AsyncMock()
+        mock_page.evaluate = AsyncMock(return_value="")
+        mock_page.keyboard = MagicMock()
+        mock_page.keyboard.type = AsyncMock()
+
+        def make_btn(count):
+            b = MagicMock()
+            b.count = AsyncMock(return_value=count)
+            b.click = AsyncMock()
+            b.wait_for = AsyncMock()
+            return b
+
+        def wrap(btn):
+            loc = MagicMock()
+            loc.first = btn
+            return loc
+
+        connect_btn = make_btn(connect_btn_count)
+        more_btn = make_btn(more_btn_count)
+        menuitem_connect = make_btn(menuitem_connect_count)
+        add_note_btn = make_btn(add_note_count)
+        send_btn = make_btn(send_btn_count)
+        note_box = make_btn(1)
+        no_btn = make_btn(0)
+
+        # Distinguish locator calls by selector string
+        def locator_side_effect(selector):
+            loc = MagicMock()
+            if selector == "button.artdeco-button--primary":
+                # .filter(...).nth(1) → connect_btn
+                loc.filter.return_value.nth.return_value = connect_btn
+            elif selector == "button":
+                # .filter(has_text="More").nth(1) → more_btn
+                loc.filter.return_value.nth.return_value = more_btn
+                # .filter(has_text="Follow").first → no_btn (follow_company uses this)
+                loc.filter.return_value.first = no_btn
+            elif selector == "textarea[name='message']":
+                loc.first = note_box
+            else:
+                loc.first = no_btn
+                loc.filter.return_value.nth.return_value = no_btn
+            return loc
+
+        mock_page.locator = MagicMock(side_effect=locator_side_effect)
+
+        mock_page.get_by_role = MagicMock(side_effect=lambda role, **kw: {
+            "Add a note": wrap(add_note_btn),
+            "Send": wrap(send_btn),
+            "Send without a note": wrap(send_btn),
+            "Connect": wrap(menuitem_connect),
+        }.get(kw.get("name"), wrap(no_btn)))
+
+        return mock_page, connect_btn, more_btn, menuitem_connect, add_note_btn, send_btn, note_box
+
+    async def test_send_without_note(self, mock_context):
+        mock_page, connect_btn, _, _, _, send_btn, _ = self._make_page_mock()
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "send_connection_request")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "success"
+        assert result["recipient"] == "testuser"
+        assert "message_preview" not in result
+        connect_btn.click.assert_awaited_once()
+        send_btn.click.assert_awaited_once()
+
+    async def test_send_with_note(self, mock_context):
+        mock_page, connect_btn, _, _, add_note_btn, send_btn, note_box = self._make_page_mock()
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "send_connection_request")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn(
+                "testuser", mock_context, message="Hi, let's connect!", extractor=mock_extractor
+            )
+
+        assert result["status"] == "success"
+        assert result["message_preview"] == "Hi, let's connect!"
+        connect_btn.click.assert_awaited_once()
+        add_note_btn.click.assert_awaited_once()
+        send_btn.click.assert_awaited_once()
+
+    async def test_connect_button_not_found(self, mock_context):
+        mock_page, *_ = self._make_page_mock(connect_btn_count=0)
+        # "More" dropdown also absent — _make_page_mock already sets up no_btn for "More"
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "send_connection_request")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "error"
+        assert "Connect button not found" in result["error"]
+
+    async def test_connect_via_more_dropdown(self, mock_context):
+        mock_page, _, more_btn, menuitem_connect, _, send_btn, _ = self._make_page_mock(
+            connect_btn_count=0,
+            more_btn_count=1,
+            menuitem_connect_count=1,
+        )
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "send_connection_request")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "success"
+        assert result["recipient"] == "testuser"
+        more_btn.click.assert_awaited_once()
+        menuitem_connect.click.assert_awaited_once()
+        send_btn.click.assert_awaited_once()
+
+
 class TestJobTools:
     async def test_get_job_details(self, mock_context):
         expected = {
@@ -416,6 +597,198 @@ class TestJobTools:
         assert "pages_visited" not in result
 
 
+class TestGetInbox:
+    def _make_page_mock(self, conversations=None):
+        mock_page = MagicMock()
+        mock_page.goto = AsyncMock()
+        if conversations is None:
+            conversations = [
+                {
+                    "name": "Jane Smith",
+                    "preview": "Yes, I'd love to connect!",
+                    "timestamp": "2h",
+                    "unread": True,
+                    "thread_url": "/messaging/thread/2-abc123/",
+                },
+                {
+                    "name": "Bob Jones",
+                    "preview": "Thanks for reaching out",
+                    "timestamp": "1d",
+                    "unread": False,
+                    "thread_url": "/messaging/thread/2-def456/",
+                },
+            ]
+        # First evaluate call returns conversations, subsequent ones return None (username lookup)
+        call_count = 0
+
+        async def evaluate_side_effect(script, *args):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return conversations
+            return None  # username enrichment returns None
+
+        mock_page.evaluate = AsyncMock(side_effect=evaluate_side_effect)
+        return mock_page
+
+    async def test_get_inbox_returns_conversations(self, mock_context):
+        mock_page = self._make_page_mock()
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.messaging import register_messaging_tools
+
+        mcp = FastMCP("test")
+        register_messaging_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_inbox")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn(mock_context, extractor=mock_extractor)
+
+        assert "conversations" in result
+        assert len(result["conversations"]) == 2
+        assert result["conversations"][0]["name"] == "Jane Smith"
+        assert result["conversations"][0]["unread"] is True
+
+    async def test_get_inbox_unread_only(self, mock_context):
+        mock_page = self._make_page_mock()
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.messaging import register_messaging_tools
+
+        mcp = FastMCP("test")
+        register_messaging_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_inbox")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn(mock_context, unread_only=True, extractor=mock_extractor)
+
+        assert len(result["conversations"]) == 1
+        assert result["conversations"][0]["name"] == "Jane Smith"
+
+
+class TestGetConversation:
+    def _make_page_mock(self, message_btn_count=1, messages=None):
+        mock_page = MagicMock()
+        mock_page.goto = AsyncMock()
+
+        msg_btn = MagicMock()
+        msg_btn.count = AsyncMock(return_value=message_btn_count)
+        msg_btn.click = AsyncMock()
+
+        def locator_side_effect(selector):
+            loc = MagicMock()
+            if selector == "button.artdeco-button--primary":
+                loc.filter.return_value.nth.return_value = msg_btn
+            return loc
+
+        mock_page.locator = MagicMock(side_effect=locator_side_effect)
+
+        if messages is None:
+            messages = [
+                {"sender": "me", "text": "Hi Jane, ...", "timestamp": "Mar 15"},
+                {"sender": "Jane Smith", "text": "Yes, interested!", "timestamp": "Mar 16"},
+            ]
+        mock_page.evaluate = AsyncMock(return_value=messages)
+        return mock_page, msg_btn
+
+    async def test_get_conversation_returns_messages(self, mock_context):
+        mock_page, _ = self._make_page_mock()
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.messaging import register_messaging_tools
+
+        mcp = FastMCP("test")
+        register_messaging_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_conversation")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
+
+        assert result["linkedin_username"] == "janesmith"
+        assert len(result["messages"]) == 2
+        assert result["messages"][1]["sender"] == "Jane Smith"
+
+    async def test_get_conversation_no_message_button(self, mock_context):
+        mock_page, _ = self._make_page_mock(message_btn_count=0)
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.messaging import register_messaging_tools
+
+        mcp = FastMCP("test")
+        register_messaging_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_conversation")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "error"
+        assert "1st-degree" in result["error"]
+
+    async def test_get_conversation_falls_back_to_raw_text(self, mock_context):
+        mock_page, _ = self._make_page_mock(messages=[])  # empty structured result
+        # Second evaluate call (fallback) returns raw text
+        raw_text = "Jane Smith\nYes, interested!\nMar 16"
+        mock_page.evaluate = AsyncMock(side_effect=[[], raw_text])
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.messaging import register_messaging_tools
+
+        mcp = FastMCP("test")
+        register_messaging_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_conversation")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
+
+        assert "messages_raw" in result
+        assert result["messages_raw"] == raw_text
+
+
 class TestToolTimeouts:
     async def test_all_tools_have_global_timeout(self):
         from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
@@ -430,6 +803,8 @@ class TestToolTimeouts:
             "get_company_posts",
             "get_job_details",
             "search_jobs",
+            "get_inbox",
+            "get_conversation",
             "close_session",
         )
 

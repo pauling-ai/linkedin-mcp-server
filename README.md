@@ -7,21 +7,50 @@ Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerd
 | Tool | Description |
 |------|-------------|
 | `send_message` | Send a LinkedIn message to a 1st-degree connection |
+| `send_connection_request` | Send a connection request, with or without a note |
+| `follow_company` | Follow a LinkedIn company page |
+| `get_inbox` | Read recent inbox conversations (supports `unread_only`) |
+| `get_conversation` | Read the full message thread with a specific person |
 | `get_post_likers` | Get the list of people who reacted to a LinkedIn post |
 
 ## All Tools
 
+### People
 | Tool | Description |
 |------|-------------|
-| `get_person_profile` | Get profile info with optional section selection (experience, education, interests, honors, languages, contact_info, posts) |
-| `get_company_profile` | Extract company information with optional section selection (posts, jobs) |
-| `get_company_posts` | Get recent posts from a company's LinkedIn feed |
-| `search_people` | Search for people by keywords and location |
-| `search_jobs` | Search for jobs with keywords and location filters |
-| `get_job_details` | Get detailed information about a specific job posting |
-| `get_post_likers` | Get the list of people who reacted to a LinkedIn post |
-| `send_message` | Send a LinkedIn message to a 1st-degree connection |
-| `close_session` | Close browser session and clean up resources |
+| `get_person_profile` | Get profile info with optional sections: `experience`, `education`, `interests`, `honors`, `languages`, `contact_info`, `posts` |
+| `search_people` | Search for people by keywords and optional location |
+| `send_connection_request` | Send a connection request, with or without a note (~300 char limit); handles profiles where Connect is in the More dropdown |
+| `send_message` | Send a message to a 1st-degree connection (also used to reply to existing threads) |
+
+### Companies
+| Tool | Description |
+|------|-------------|
+| `get_company_profile` | Get company info with optional sections: `posts`, `jobs` |
+| `get_company_posts` | Get recent posts from a company's feed; returns post URNs for further use |
+| `follow_company` | Follow a company page |
+
+### Jobs
+| Tool | Description |
+|------|-------------|
+| `search_jobs` | Search for jobs by keywords and optional location |
+| `get_job_details` | Get full details of a specific job posting |
+
+### Messaging
+| Tool | Description |
+|------|-------------|
+| `get_inbox` | List recent inbox conversations with name, preview, timestamp, and unread flag; pass `unread_only=true` to filter |
+| `get_conversation` | Read the full message thread with a person by their LinkedIn username |
+
+### Posts
+| Tool | Description |
+|------|-------------|
+| `get_post_likers` | Get the list of people who reacted to a post (by feed URL or post URN) |
+
+### Session
+| Tool | Description |
+|------|-------------|
+| `close_session` | Close the browser session and clean up resources |
 
 ## Setup
 
@@ -122,7 +151,9 @@ The `uv` approach is the simplest — just update the `--directory` path and you
 
 **Timeout issues:** Increase with `--timeout 10000` or env var `TIMEOUT=10000`.
 
-**`send_message` not finding the Message button:** The target user must be a 1st-degree connection. The tool will return an error with diagnostic info if the button isn't found.
+**`send_message` / `get_conversation` not finding the Message button:** The target user must be a 1st-degree connection. The tool returns an error with diagnostic info if the button isn't found.
+
+**`send_connection_request` not finding the Connect button:** The user may already be a connection, have a pending request, or not allow connection requests. If Connect is hidden behind a More dropdown, the tool handles this automatically.
 
 ## Notes
 
