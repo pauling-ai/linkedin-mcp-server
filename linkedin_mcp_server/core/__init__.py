@@ -15,10 +15,9 @@ from .exceptions import (
     LinkedInScraperException,
     NetworkError,
     ProfileNotFoundError,
-    RateLimitError,
     ScrapingError,
 )
-from .utils import detect_rate_limit, handle_modal_close, scroll_to_bottom
+from .utils import handle_modal_close, scroll_to_bottom
 
 __all__ = [
     "AuthenticationError",
@@ -29,9 +28,7 @@ __all__ = [
     "LinkedInScraperException",
     "NetworkError",
     "ProfileNotFoundError",
-    "RateLimitError",
     "ScrapingError",
-    "detect_rate_limit",
     "handle_modal_close",
     "is_logged_in",
     "resolve_remember_me_prompt",

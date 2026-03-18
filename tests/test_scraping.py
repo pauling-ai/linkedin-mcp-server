@@ -8,7 +8,6 @@ from linkedin_mcp_server.core.exceptions import AuthenticationError
 from linkedin_mcp_server.scraping.extractor import (
     ExtractedSection,
     LinkedInExtractor,
-    _RATE_LIMITED_MSG,
     _truncate_linkedin_noise,
     strip_linkedin_noise,
 )
@@ -147,14 +146,10 @@ class TestExtractPage:
             }
         )
         extractor = LinkedInExtractor(mock_page)
-        # Patch scroll_to_bottom and detect_rate_limit to avoid complex mock chains
+        # Patch scroll_to_bottom to avoid complex mock chains
         with (
             patch(
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -229,109 +224,6 @@ class TestExtractPage:
                 section_name="main_profile",
             )
 
-    async def test_rate_limit_detected(self, mock_page):
-        from linkedin_mcp_server.core.exceptions import RateLimitError
-
-        extractor = LinkedInExtractor(mock_page)
-        with (
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-                side_effect=RateLimitError("Rate limited", suggested_wait_time=3600),
-            ),
-            pytest.raises(RateLimitError),
-        ):
-            await extractor.extract_page(
-                "https://www.linkedin.com/in/testuser/",
-                section_name="main_profile",
-            )
-
-    async def test_returns_rate_limited_msg_after_retry(self, mock_page):
-        """When both attempts return only noise, surface rate limit message."""
-        noise_only = (
-            "More profiles for you\n\n"
-            "You've approached your profile search limit\n\n"
-            "About\nAccessibility\nTalent Solutions"
-        )
-        mock_page.evaluate = AsyncMock(
-            return_value={"source": "root", "text": noise_only, "references": []}
-        )
-        extractor = LinkedInExtractor(mock_page)
-        with (
-            patch(
-                "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.handle_modal_close",
-                new_callable=AsyncMock,
-                return_value=False,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.asyncio.sleep",
-                new_callable=AsyncMock,
-            ),
-        ):
-            result = await extractor.extract_page(
-                "https://www.linkedin.com/in/testuser/details/experience/",
-                section_name="experience",
-            )
-
-        assert result.text == _RATE_LIMITED_MSG
-        # goto called twice (initial + retry)
-        assert mock_page.goto.await_count == 2
-
-    async def test_retry_succeeds_after_rate_limit(self, mock_page):
-        """When first attempt is rate-limited but retry succeeds, return content."""
-        noise_only = "More profiles for you\n\nAbout\nAccessibility\nTalent Solutions"
-        call_count = 0
-
-        async def evaluate_side_effect(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count <= 1:
-                return noise_only
-            return "Education\nHarvard University\n1973 – 1975"
-
-        async def root_content_side_effect(*args, **kwargs):
-            return {
-                "source": "root",
-                "text": await evaluate_side_effect(),
-                "references": [],
-            }
-
-        mock_page.evaluate = AsyncMock(side_effect=root_content_side_effect)
-        extractor = LinkedInExtractor(mock_page)
-        with (
-            patch(
-                "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.handle_modal_close",
-                new_callable=AsyncMock,
-                return_value=False,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.asyncio.sleep",
-                new_callable=AsyncMock,
-            ),
-        ):
-            result = await extractor.extract_page(
-                "https://www.linkedin.com/in/testuser/details/education/",
-                section_name="education",
-            )
-
-        assert result.text == "Education\nHarvard University\n1973 – 1975"
-
     async def test_media_only_controls_are_not_misclassified_as_rate_limited(
         self, mock_page
     ):
@@ -346,10 +238,6 @@ class TestExtractPage:
         with (
             patch(
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -813,7 +701,7 @@ class TestScrapePersonUrls:
             "/tmp/issue.md"
         )
 
-    async def test_rate_limited_sections_are_omitted(self, mock_page):
+    async def test_empty_sections_are_omitted(self, mock_page):
         extractor = LinkedInExtractor(mock_page)
         with (
             patch.object(
@@ -821,7 +709,7 @@ class TestScrapePersonUrls:
                 "extract_page",
                 new_callable=AsyncMock,
                 side_effect=[
-                    extracted(_RATE_LIMITED_MSG),
+                    extracted(""),
                     extracted("Post text"),
                 ],
             ),
@@ -912,7 +800,7 @@ class TestScrapeCompany:
         assert any("/jobs/" in u for u in urls)
         assert set(result["sections"]) == {"about", "posts", "jobs"}
 
-    async def test_rate_limited_company_sections_are_omitted(self, mock_page):
+    async def test_empty_company_sections_are_omitted(self, mock_page):
         extractor = LinkedInExtractor(mock_page)
         with (
             patch.object(
@@ -920,7 +808,7 @@ class TestScrapeCompany:
                 "extract_page",
                 new_callable=AsyncMock,
                 side_effect=[
-                    extracted(_RATE_LIMITED_MSG),
+                    extracted(""),
                     extracted("Posts text"),
                 ],
             ),
@@ -951,13 +839,13 @@ class TestScrapeJob:
         assert "pages_visited" not in result
         assert "sections_requested" not in result
 
-    async def test_scrape_job_omits_rate_limited_sentinel(self, mock_page):
+    async def test_scrape_job_omits_empty_text(self, mock_page):
         extractor = LinkedInExtractor(mock_page)
         with patch.object(
             extractor,
             "extract_page",
             new_callable=AsyncMock,
-            return_value=extracted(_RATE_LIMITED_MSG),
+            return_value=extracted(""),
         ):
             result = await extractor.scrape_job("12345")
 
@@ -1435,15 +1323,15 @@ class TestSearchJobs:
             ]
         }
 
-    async def test_rate_limited_skips_ids_and_text(self, mock_page):
-        """Rate-limited pages should yield no IDs or text."""
+    async def test_empty_page_skips_ids_and_text(self, mock_page):
+        """Empty pages should yield no IDs or text."""
         extractor = LinkedInExtractor(mock_page)
         with (
             patch.object(
                 extractor,
                 "_extract_search_page",
                 new_callable=AsyncMock,
-                return_value=extracted(_RATE_LIMITED_MSG),
+                return_value=extracted(""),
             ),
             patch.object(
                 extractor,
@@ -1584,10 +1472,6 @@ class TestActivityFeedExtraction:
                 new_callable=AsyncMock,
             ) as mock_scroll,
             patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-            ),
-            patch(
                 "linkedin_mcp_server.scraping.extractor.handle_modal_close",
                 new_callable=AsyncMock,
                 return_value=False,
@@ -1617,10 +1501,6 @@ class TestActivityFeedExtraction:
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
                 new_callable=AsyncMock,
             ) as mock_scroll,
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-            ),
             patch(
                 "linkedin_mcp_server.scraping.extractor.handle_modal_close",
                 new_callable=AsyncMock,
@@ -1653,10 +1533,6 @@ class TestActivityFeedExtraction:
         with (
             patch(
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -1694,10 +1570,6 @@ class TestSearchResultsExtraction:
                 new_callable=AsyncMock,
             ),
             patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
-                new_callable=AsyncMock,
-            ),
-            patch(
                 "linkedin_mcp_server.scraping.extractor.handle_modal_close",
                 new_callable=AsyncMock,
                 return_value=False,
@@ -1721,10 +1593,6 @@ class TestSearchResultsExtraction:
         with (
             patch(
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -1755,10 +1623,6 @@ class TestSearchResultsExtraction:
         with (
             patch(
                 "linkedin_mcp_server.scraping.extractor.scroll_to_bottom",
-                new_callable=AsyncMock,
-            ),
-            patch(
-                "linkedin_mcp_server.scraping.extractor.detect_rate_limit",
                 new_callable=AsyncMock,
             ),
             patch(

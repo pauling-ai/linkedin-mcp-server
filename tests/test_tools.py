@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastmcp import FastMCP
 
-from linkedin_mcp_server.scraping.extractor import ExtractedSection, _RATE_LIMITED_MSG
+from linkedin_mcp_server.scraping.extractor import ExtractedSection
 
 
 async def get_tool_fn(
@@ -223,10 +223,10 @@ class TestCompanyTools:
         assert "pages_visited" not in result
         assert "sections_requested" not in result
 
-    async def test_get_company_posts_omits_rate_limited_sentinel(self, mock_context):
+    async def test_get_company_posts_omits_empty_text(self, mock_context):
         mock_extractor = MagicMock()
         mock_extractor.extract_page = AsyncMock(
-            return_value=ExtractedSection(text=_RATE_LIMITED_MSG, references=[])
+            return_value=ExtractedSection(text="", references=[])
         )
 
         from linkedin_mcp_server.tools.company import register_company_tools

@@ -17,7 +17,6 @@ from linkedin_mcp_server.core.exceptions import (
     LinkedInScraperException,
     NetworkError,
     ProfileNotFoundError,
-    RateLimitError,
     ScrapingError,
 )
 
@@ -91,13 +90,6 @@ def raise_tool_error(exception: Exception, context: str = "") -> NoReturn:
             "Authentication failed. Run with --login to re-authenticate.",
             context=context,
         )
-
-    elif isinstance(exception, RateLimitError):
-        wait_time = getattr(exception, "suggested_wait_time", 300)
-        logger.warning("Rate limit%s: %s (wait=%ds)", ctx, exception, wait_time)
-        raise ToolError(
-            f"Rate limit detected. Wait {wait_time} seconds before trying again."
-        ) from exception
 
     elif isinstance(exception, ProfileNotFoundError):
         logger.warning("Profile not found%s: %s", ctx, exception)

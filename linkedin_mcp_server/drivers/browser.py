@@ -14,7 +14,6 @@ from linkedin_mcp_server.core import (
     AuthenticationError,
     BrowserManager,
     detect_auth_barrier_quick,
-    detect_rate_limit,
     is_logged_in,
     resolve_remember_me_prompt,
 )
@@ -546,19 +545,6 @@ async def ensure_authenticated() -> None:
     """
     if not await validate_session():
         raise AuthenticationError("Session expired or invalid.")
-
-
-async def check_rate_limit() -> None:
-    """
-    Proactively check for rate limiting.
-
-    Should be called after navigation to detect if LinkedIn is blocking requests.
-
-    Raises:
-        RateLimitError: If rate limiting is detected
-    """
-    browser = await get_or_create_browser()
-    await detect_rate_limit(browser.page)
 
 
 def reset_browser_for_testing() -> None:

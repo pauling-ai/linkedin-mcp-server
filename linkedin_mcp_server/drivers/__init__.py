@@ -15,7 +15,6 @@ Key Components:
 
 from linkedin_mcp_server.drivers.browser import (
     DEFAULT_PROFILE_DIR,
-    check_rate_limit,
     close_browser,
     ensure_authenticated,
     get_or_create_browser,
@@ -28,7 +27,6 @@ from linkedin_mcp_server.drivers.browser import (
 
 __all__ = [
     "DEFAULT_PROFILE_DIR",
-    "check_rate_limit",
     "close_browser",
     "ensure_authenticated",
     "get_or_create_browser",

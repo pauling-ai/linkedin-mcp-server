@@ -4,7 +4,6 @@ from fastmcp.exceptions import ToolError
 from linkedin_mcp_server.core.exceptions import (
     NetworkError,
     ProfileNotFoundError,
-    RateLimitError,
     ScrapingError,
 )
 from linkedin_mcp_server.error_handler import raise_tool_error
@@ -25,35 +24,9 @@ def test_raises_tool_error_for_credentials_not_found():
         raise_tool_error(CredentialsNotFoundError("no creds"))
 
 
-def test_raises_tool_error_for_rate_limit_with_custom_wait():
-    error = RateLimitError("Rate limited")
-    error.suggested_wait_time = 600
-    with pytest.raises(ToolError, match="Wait 600 seconds"):
-        raise_tool_error(error)
-
-
-def test_raises_tool_error_for_rate_limit_default_wait():
-    error = RateLimitError("Rate limited")
-    with pytest.raises(ToolError, match="Wait 300 seconds"):
-        raise_tool_error(error)
-
-
 def test_raises_tool_error_for_profile_not_found():
     with pytest.raises(ToolError, match="Profile not found"):
         raise_tool_error(ProfileNotFoundError("gone"))
-
-
-def test_rate_limit_skips_issue_diagnostics(monkeypatch):
-    monkeypatch.setattr(
-        "linkedin_mcp_server.error_handler.build_issue_diagnostics",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("diagnostics should not run")
-        ),
-    )
-    error = RateLimitError("Rate limited")
-
-    with pytest.raises(ToolError, match="Wait 300 seconds"):
-        raise_tool_error(error)
 
 
 def test_profile_not_found_skips_issue_diagnostics(monkeypatch):

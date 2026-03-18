@@ -13,7 +13,7 @@ from typing import Literal
 
 import inquirer
 
-from linkedin_mcp_server.core import AuthenticationError, RateLimitError
+from linkedin_mcp_server.core import AuthenticationError
 
 from linkedin_mcp_server.authentication import (
     clear_auth_state,
@@ -358,7 +358,7 @@ def main() -> None:
                 print("\n\n👋 Setup cancelled by user")
             sys.exit(0)
 
-        except (AuthenticationError, RateLimitError) as e:
+        except AuthenticationError as e:
             logger.error(f"LinkedIn error during setup: {e}")
             if config.is_interactive:
                 print(f"\n❌ {str(e)}")
