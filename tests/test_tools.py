@@ -1,5 +1,5 @@
 from typing import Any, Callable, Coroutine
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp import FastMCP
@@ -312,6 +312,70 @@ class TestCompanyTools:
         result = await tool_fn("testcorp", mock_context, extractor=mock_extractor)
         assert result["sections"] == {}
         assert "references" not in result
+
+
+class TestFollowCompany:
+    def _make_page_mock(self, btn_count: int):
+        mock_btn = MagicMock()
+        mock_btn.count = AsyncMock(return_value=btn_count)
+        mock_btn.click = AsyncMock()
+
+        mock_page = MagicMock()
+        mock_page.goto = AsyncMock()
+        # chain: locator("button").filter(has_text="Follow").first → mock_btn
+        mock_page.locator.return_value.filter.return_value.first = mock_btn
+        return mock_page, mock_btn
+
+    async def test_follow_company_success(self, mock_context):
+        mock_page, mock_btn = self._make_page_mock(btn_count=1)
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "follow_company")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "success"
+        assert "anthropic" in result["company_url"]
+        mock_btn.click.assert_awaited_once()
+
+    async def test_follow_company_button_not_found(self, mock_context):
+        mock_page, _ = self._make_page_mock(btn_count=0)
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "follow_company")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
+
+        assert result["status"] == "error"
+        assert "Follow button not found" in result["error"]
 
 
 class TestJobTools:

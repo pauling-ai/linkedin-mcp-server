@@ -5,6 +5,7 @@ Uses innerText extraction for resilient company data capture
 with configurable section selection.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -136,3 +137,56 @@ def register_company_tools(mcp: FastMCP) -> None:
 
         except Exception as e:
             raise_tool_error(e, "get_company_posts")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Follow Company",
+        annotations={"openWorldHint": True},
+        tags={"company", "action"},
+    )
+    async def follow_company(
+        company_name: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Follow a LinkedIn company page.
+
+        Args:
+            company_name: LinkedIn company name (e.g., "docker", "anthropic", "microsoft")
+
+        Returns:
+            Dict with status and company_url.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to company page")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            company_url = f"https://www.linkedin.com/company/{company_name}/"
+            await page.goto(company_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.0)
+
+            await ctx.report_progress(progress=50, total=100, message="Looking for Follow button")
+            follow_btn = page.locator("button").filter(has_text="Follow").first
+            btn_count = await follow_btn.count()
+            if not btn_count:
+                return {
+                    "status": "error",
+                    "error": "Follow button not found. Company may not exist or you may already follow it.",
+                    "company_url": company_url,
+                }
+
+            await follow_btn.click()
+            await asyncio.sleep(1.0)
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            return {
+                "status": "success",
+                "company_url": company_url,
+            }
+
+        except Exception as e:
+            raise_tool_error(e, "follow_company")  # NoReturn
