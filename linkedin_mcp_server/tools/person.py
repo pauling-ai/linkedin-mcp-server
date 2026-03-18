@@ -429,3 +429,142 @@ def register_person_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("follow_person: unhandled exception for %s", linkedin_username)
             raise_tool_error(e, "follow_person")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Check Follow Person",
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+        tags={"person", "connections"},
+    )
+    async def check_follow(
+        linkedin_username: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Check whether we are already following a LinkedIn person.
+
+        Args:
+            linkedin_username: LinkedIn username (e.g., "jtordable", "williamhgates")
+
+        Returns:
+            Dict with following (bool) and profile_url.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to profile")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
+            await page.goto(profile_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.5)
+
+            await ctx.report_progress(progress=60, total=100, message="Checking follow status")
+
+            # Creator profiles: primary button is "Follow"/"Following"
+            following_btn = page.locator("button.artdeco-button--primary").filter(has_text="Following").nth(1)
+            if await following_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": True, "profile_url": profile_url}
+
+            follow_btn = page.locator("button.artdeco-button--primary").filter(has_text="Follow").nth(1)
+            if await follow_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": False, "profile_url": profile_url}
+
+            # Regular profiles: Follow/Unfollow lives inside the "More" dropdown
+            more_btn = page.locator("button").filter(has_text="More").nth(1)
+            if await more_btn.count():
+                await more_btn.click()
+                await asyncio.sleep(1.0)
+                unfollow_item = page.get_by_role("menuitem", name="Unfollow", exact=True).first
+                if await unfollow_item.count():
+                    # Close the dropdown before returning
+                    await page.keyboard.press("Escape")
+                    await ctx.report_progress(progress=100, total=100, message="Complete")
+                    return {"following": True, "profile_url": profile_url}
+                follow_item = page.get_by_role("menuitem", name="Follow", exact=True).first
+                if await follow_item.count():
+                    await page.keyboard.press("Escape")
+                    await ctx.report_progress(progress=100, total=100, message="Complete")
+                    return {"following": False, "profile_url": profile_url}
+                await page.keyboard.press("Escape")
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            return {"following": None, "profile_url": profile_url, "note": "Could not determine follow status"}
+
+        except Exception as e:
+            logger.exception("check_follow: unhandled exception for %s", linkedin_username)
+            raise_tool_error(e, "check_follow")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Check Connection",
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+        tags={"person", "connections"},
+    )
+    async def check_connection(
+        linkedin_username: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Check whether we are connected to a LinkedIn person.
+
+        Args:
+            linkedin_username: LinkedIn username (e.g., "jtordable", "williamhgates")
+
+        Returns:
+            Dict with connected (bool), status ("connected" | "pending" | "not_connected"),
+            and profile_url.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to profile")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
+            await page.goto(profile_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.5)
+
+            await ctx.report_progress(progress=60, total=100, message="Checking connection status")
+
+            # 1st-degree: Message button is the primary CTA
+            message_btn = page.locator("button.artdeco-button--primary").filter(has_text="Message").nth(1)
+            if await message_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"connected": True, "status": "connected", "profile_url": profile_url}
+
+            # Pending request: primary button reads "Pending"
+            pending_btn = page.locator("button").filter(has_text="Pending").nth(1)
+            if await pending_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"connected": False, "status": "pending", "profile_url": profile_url}
+
+            # Connect button present (primary or inside More dropdown)
+            connect_btn = page.locator("button.artdeco-button--primary").filter(has_text="Connect").nth(1)
+            if await connect_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"connected": False, "status": "not_connected", "profile_url": profile_url}
+
+            more_btn = page.locator("button").filter(has_text="More").nth(1)
+            if await more_btn.count():
+                await more_btn.click()
+                await asyncio.sleep(1.0)
+                connect_item = page.get_by_role("menuitem", name="Connect", exact=True).first
+                if await connect_item.count():
+                    await page.keyboard.press("Escape")
+                    await ctx.report_progress(progress=100, total=100, message="Complete")
+                    return {"connected": False, "status": "not_connected", "profile_url": profile_url}
+                await page.keyboard.press("Escape")
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            return {"connected": None, "status": "unknown", "profile_url": profile_url, "note": "Could not determine connection status"}
+
+        except Exception as e:
+            logger.exception("check_connection: unhandled exception for %s", linkedin_username)
+            raise_tool_error(e, "check_connection")  # NoReturn

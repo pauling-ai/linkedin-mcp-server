@@ -190,3 +190,53 @@ def register_company_tools(mcp: FastMCP) -> None:
 
         except Exception as e:
             raise_tool_error(e, "follow_company")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
+        title="Check Follow Company",
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+        tags={"company", "action"},
+    )
+    async def check_follow_company(
+        company_name: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Check whether we are already following a LinkedIn company page.
+
+        Args:
+            company_name: LinkedIn company name (e.g., "docker", "anthropic", "microsoft")
+
+        Returns:
+            Dict with following (bool) and company_url.
+        """
+        try:
+            from linkedin_mcp_server.drivers.browser import get_or_create_browser
+
+            await ctx.report_progress(progress=0, total=100, message="Navigating to company page")
+            browser = await get_or_create_browser()
+            page = browser.page
+
+            company_url = f"https://www.linkedin.com/company/{company_name}/"
+            await page.goto(company_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2.0)
+
+            await ctx.report_progress(progress=60, total=100, message="Checking follow status")
+
+            # "Following" button means we already follow; "Follow" means we don't
+            following_btn = page.locator("button").filter(has_text="Following").first
+            if await following_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": True, "company_url": company_url}
+
+            follow_btn = page.locator("button").filter(has_text="Follow").first
+            if await follow_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": False, "company_url": company_url}
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+            return {"following": None, "company_url": company_url, "note": "Could not determine follow status"}
+
+        except Exception as e:
+            raise_tool_error(e, "check_follow_company")  # NoReturn
