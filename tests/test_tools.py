@@ -959,6 +959,9 @@ class TestCheckFollow:
                 loc.filter = MagicMock(side_effect=primary_filter)
             elif selector == "button":
                 loc.filter.return_value.nth.return_value = more_btn
+            else:
+                # aria-label selectors — return count=0 by default so tests fall through
+                loc.nth.return_value = no_btn
             return loc
 
         mock_page.locator = MagicMock(side_effect=locator_side_effect)
@@ -1073,6 +1076,97 @@ class TestCheckFollow:
 
         assert result["following"] is False
         more_btn.click.assert_awaited_once()
+
+    async def test_following_via_aria_label(self, mock_context):
+        """Icon-only button: aria-label='Following' with no visible text."""
+        mock_page, _, _, _, _, _ = self._make_page_mock()  # has_text counts all 0
+
+        # Inject aria-label locator responses
+        following_aria = MagicMock()
+        following_aria.count = AsyncMock(return_value=1)
+        follow_aria = MagicMock()
+        follow_aria.count = AsyncMock(return_value=0)
+
+        original_locator = mock_page.locator.side_effect
+
+        def locator_with_aria(selector):
+            if selector == "button[aria-label^='Following']":
+                loc = MagicMock()
+                loc.nth.return_value = following_aria
+                return loc
+            if selector == "button[aria-label^='Follow ']":
+                loc = MagicMock()
+                loc.nth.return_value = follow_aria
+                return loc
+            return original_locator(selector)
+
+        mock_page.locator.side_effect = locator_with_aria
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "check_follow")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["following"] is True
+
+    async def test_not_following_via_aria_label(self, mock_context):
+        """Icon-only button: aria-label='Follow David Van Der Spoel' with no visible text."""
+        mock_page, _, _, _, _, _ = self._make_page_mock()  # has_text counts all 0
+
+        following_aria = MagicMock()
+        following_aria.count = AsyncMock(return_value=0)
+        follow_aria = MagicMock()
+        follow_aria.count = AsyncMock(return_value=1)
+
+        original_locator = mock_page.locator.side_effect
+
+        def locator_with_aria(selector):
+            if selector == "button[aria-label^='Following']":
+                loc = MagicMock()
+                loc.nth.return_value = following_aria
+                return loc
+            if selector == "button[aria-label^='Follow ']":
+                loc = MagicMock()
+                loc.nth.return_value = follow_aria
+                return loc
+            return original_locator(selector)
+
+        mock_page.locator.side_effect = locator_with_aria
+        mock_browser = MagicMock()
+        mock_browser.page = mock_page
+        mock_extractor = MagicMock()
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "check_follow")
+
+        with (
+            patch(
+                "linkedin_mcp_server.drivers.browser.get_or_create_browser",
+                new_callable=AsyncMock,
+                return_value=mock_browser,
+            ),
+            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
+
+        assert result["following"] is False
 
     async def test_unknown_follow_status(self, mock_context):
         mock_page, _, _, _, _, _ = self._make_page_mock()  # all count=0

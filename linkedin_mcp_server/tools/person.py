@@ -463,7 +463,9 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=60, total=100, message="Checking follow status")
 
-            # Creator profiles: primary button is "Follow"/"Following"
+            # Creator profiles: primary button is "Follow"/"Following".
+            # Check visible text first, then aria-label (icon-only buttons use aria-label
+            # e.g. aria-label="Follow David Van Der Spoel" with no visible text content).
             following_btn = page.locator("button.artdeco-button--primary").filter(has_text="Following").nth(1)
             if await following_btn.count():
                 await ctx.report_progress(progress=100, total=100, message="Complete")
@@ -471,6 +473,15 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             follow_btn = page.locator("button.artdeco-button--primary").filter(has_text="Follow").nth(1)
             if await follow_btn.count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": False, "profile_url": profile_url}
+
+            # aria-label fallback: "Following" (exact) or "Follow <Name>" (starts with "Follow ")
+            if await page.locator("button[aria-label^='Following']").nth(1).count():
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                return {"following": True, "profile_url": profile_url}
+
+            if await page.locator("button[aria-label^='Follow ']").nth(1).count():
                 await ctx.report_progress(progress=100, total=100, message="Complete")
                 return {"following": False, "profile_url": profile_url}
 
