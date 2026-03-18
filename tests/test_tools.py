@@ -210,6 +210,7 @@ class TestCompanyTools:
         mock_extractor.extract_page = AsyncMock(
             return_value=ExtractedSection(text="Post 1\nPost 2", references=[])
         )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -223,11 +224,36 @@ class TestCompanyTools:
         assert "pages_visited" not in result
         assert "sections_requested" not in result
 
+    async def test_get_company_posts_returns_post_urns(self, mock_context):
+        mock_extractor = MagicMock()
+        mock_extractor.extract_page = AsyncMock(
+            return_value=ExtractedSection(text="Post 1\nPost 2", references=[])
+        )
+        mock_extractor.extract_post_urns = AsyncMock(
+            return_value=[
+                "urn:li:activity:7439961861053157377",
+                "urn:li:activity:1111111111111111111",
+            ]
+        )
+
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+
+        tool_fn = await get_tool_fn(mcp, "get_company_posts")
+        result = await tool_fn("testcorp", mock_context, extractor=mock_extractor)
+        assert result["post_urns"] == [
+            "urn:li:activity:7439961861053157377",
+            "urn:li:activity:1111111111111111111",
+        ]
+
     async def test_get_company_posts_omits_empty_text(self, mock_context):
         mock_extractor = MagicMock()
         mock_extractor.extract_page = AsyncMock(
             return_value=ExtractedSection(text="", references=[])
         )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -247,6 +273,7 @@ class TestCompanyTools:
                 error={"issue_template_path": "/tmp/company-posts-issue.md"},
             )
         )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -274,6 +301,7 @@ class TestCompanyTools:
                 ],
             )
         )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 

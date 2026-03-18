@@ -392,8 +392,11 @@ class LinkedInExtractor:
         # Dismiss any modals blocking content
         await handle_modal_close(self._page)
 
-        # Activity feed pages lazy-load post content after the tab header
-        is_activity = "/recent-activity/" in url
+        # Activity feed pages (person recent-activity and company /posts/) lazy-load
+        # post content after the tab header — wait for real content before scrolling.
+        is_activity = "/recent-activity/" in url or (
+            "/company/" in url and url.rstrip("/").endswith("/posts")
+        )
         if is_activity:
             try:
                 await self._page.wait_for_function(
@@ -1177,3 +1180,43 @@ class LinkedInExtractor:
             {"selectors": selectors},
         )
         return result
+
+    async def extract_post_urns(self) -> list[str]:
+        """Extract activity URNs from the currently loaded page.
+
+        Queries the DOM directly for urn:li:activity:XXXXX identifiers via:
+        - data-urn attributes on feed item containers
+        - anchor hrefs in /posts/SLUG-activity-ID-HASH/ permalink format
+        - anchor hrefs in /feed/update/urn:li:... format
+
+        Should be called immediately after extract_page() while the browser
+        is still on the target page.
+        """
+        return await self._page.evaluate(
+            """() => {
+                const urns = new Set();
+
+                // data-urn attributes on feed containers (most reliable)
+                for (const el of document.querySelectorAll('[data-urn]')) {
+                    const val = el.getAttribute('data-urn') || '';
+                    const m = val.match(/urn:li:activity:\\d+/);
+                    if (m) urns.add(m[0]);
+                }
+
+                // /posts/SLUG-activity-ID-HASH/ permalink anchors
+                for (const a of document.querySelectorAll('a[href*="-activity-"]')) {
+                    const href = a.getAttribute('href') || '';
+                    const m = href.match(/-activity-(\\d{10,})-/);
+                    if (m) urns.add('urn:li:activity:' + m[1]);
+                }
+
+                // /feed/update/urn:li:activity:XXXXX/ anchors
+                for (const a of document.querySelectorAll('a[href*="/feed/update/"]')) {
+                    const href = a.getAttribute('href') || '';
+                    const m = href.match(/\\/feed\\/update\\/(urn:li:[^/?#]+)/);
+                    if (m) urns.add(m[1]);
+                }
+
+                return [...urns];
+            }"""
+        )

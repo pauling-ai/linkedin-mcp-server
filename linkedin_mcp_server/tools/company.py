@@ -108,6 +108,7 @@ def register_company_tools(mcp: FastMCP) -> None:
 
             url = f"https://www.linkedin.com/company/{company_name}/posts/"
             extracted = await extractor.extract_page(url, section_name="posts")
+            post_urns = await extractor.extract_post_urns()
 
             sections: dict[str, str] = {}
             references: dict[str, list[Reference]] = {}
@@ -121,10 +122,12 @@ def register_company_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            result = {
+            result: dict[str, Any] = {
                 "url": url,
                 "sections": sections,
             }
+            if post_urns:
+                result["post_urns"] = post_urns
             if references:
                 result["references"] = references
             if section_errors:
