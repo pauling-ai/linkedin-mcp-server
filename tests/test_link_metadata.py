@@ -497,6 +497,36 @@ class TestBuildReferences:
             }
         ]
 
+    def test_posts_permalink_extracts_activity_urn(self):
+        """Company/person post permalinks (/posts/SLUG-activity-ID-HASH/) resolve to feed_post."""
+        references = build_references(
+            [
+                {
+                    "href": "https://www.linkedin.com/posts/anthropic_we-are-excited-activity-7289292839748108288-AbCd/",
+                    "text": "2d",
+                },
+                {
+                    "href": "https://www.linkedin.com/posts/anthropic_another-post-activity-1111111111111111111-xYzW/",
+                    "aria_label": "View post",
+                },
+            ],
+            "posts",
+        )
+
+        assert references == [
+            {
+                "kind": "feed_post",
+                "url": "/feed/update/urn:li:activity:7289292839748108288/",
+                "text": "2d",
+                "context": "company post",
+            },
+            {
+                "kind": "feed_post",
+                "url": "/feed/update/urn:li:activity:1111111111111111111/",
+                "context": "company post",
+            },
+        ]
+
     def test_cross_page_dedupe_keeps_better_reference(self):
         references = dedupe_references(
             [

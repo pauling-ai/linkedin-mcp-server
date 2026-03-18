@@ -89,7 +89,7 @@ _REFERENCE_CAPS = {
     "interests": 12,
     "honors": 12,
     "languages": 12,
-    "posts": 12,
+    "posts": 30,
     "jobs": 8,
     "search_results": 15,
     "job_posting": 8,
@@ -107,6 +107,8 @@ _JOB_PATH_RE = re.compile(r"^/jobs/view/(\d+)")
 _NEWSLETTER_PATH_RE = re.compile(r"^/newsletters/([^/?#]+)")
 _PULSE_PATH_RE = re.compile(r"^/pulse/([^/?#]+)")
 _FEED_PATH_RE = re.compile(r"^/feed/update/([^/?#]+)")
+# Matches /posts/SLUG-activity-ACTIVITYID-HASH/ (company + person post permalinks)
+_POSTS_PERMALINK_RE = re.compile(r"^/posts/[^/?#]+-activity-(\d+)-")
 _MAX_REDIRECT_UNWRAP_DEPTH = 5
 
 
@@ -228,6 +230,9 @@ def classify_link(href: str) -> tuple[ReferenceKind, str] | None:
 
     if match := _FEED_PATH_RE.match(path):
         return "feed_post", f"/feed/update/{match.group(1)}/"
+
+    if match := _POSTS_PERMALINK_RE.match(path):
+        return "feed_post", f"/feed/update/urn:li:activity:{match.group(1)}/"
 
     return None
 
