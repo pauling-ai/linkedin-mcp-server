@@ -633,82 +633,181 @@ class LinkedInExtractor:
         """
         await self._goto_with_auth_checks(post_url)
 
-        # Wait for the reactions count button to appear
-        reactions_selector = (
-            "button.social-details-social-counts__reactions-count, "
-            ".social-details-social-counts__reactions-count"
-        )
+        # LinkedIn changes these classes often, so keep multiple fallback
+        # selectors and accept both the summary button and the "see more"
+        # reactions trigger.
+        reactions_selectors = [
+            "button[data-reaction-details]",
+            "button.social-details-social-counts__count-value-hover",
+            "button.social-details-social-counts__count-value",
+            "button.social-details-reactors-facepile__reactions-modal-button",
+            "button[aria-label*=' others']",
+            "button[aria-label*=' reactions']",
+        ]
+        reactions_selector = ", ".join(reactions_selectors)
+        modal_selectors = [
+            "div[role='dialog']",
+            "dialog[open]",
+            ".artdeco-modal",
+            ".artdeco-modal__content",
+        ]
+        modal_selector = ", ".join(modal_selectors)
+        scroll_targets = [
+            ".artdeco-modal__content",
+            ".artdeco-modal__body",
+            ".artdeco-modal",
+            "div[role='dialog']",
+            "dialog[open]",
+        ]
+        scroll_target_selector = ", ".join(scroll_targets)
+        link_selectors = [
+            "a[href*='/in/']",
+            "a[data-test-app-aware-link][href*='/in/']",
+        ]
+        link_selector = ", ".join(link_selectors)
+
+        # Wait for a reactions entry point to appear.
         try:
             await self._page.wait_for_selector(reactions_selector, timeout=10000)
         except PlaywrightTimeoutError:
             logger.debug("No reactions button found on %s", post_url)
-            return {"url": post_url, "likers": [], "count": 0, "error": "No reactions found on this post"}
+            return {
+                "url": post_url,
+                "likers": [],
+                "count": 0,
+                "error": "No reactions found on this post",
+            }
 
-        # Click the reactions button to open the likers modal
-        try:
-            btn = self._page.locator(reactions_selector).first
-            await btn.click()
-        except Exception as e:
-            logger.warning("Could not click reactions button on %s: %s", post_url, e)
-            return {"url": post_url, "likers": [], "count": 0, "error": "Could not open reactions modal"}
+        # Click the first viable reactions trigger.
+        clicked = False
+        for selector in reactions_selectors:
+            locator = self._page.locator(selector)
+            try:
+                count = await locator.count()
+            except Exception:
+                continue
 
-        # Wait for the modal to open
-        modal_selector = "dialog[open], .artdeco-modal__content"
+            for index in range(count):
+                btn = locator.nth(index)
+                try:
+                    if not await btn.is_visible():
+                        continue
+                    await btn.scroll_into_view_if_needed()
+                    await btn.click(timeout=5000)
+                    clicked = True
+                    break
+                except Exception:
+                    continue
+
+            if clicked:
+                break
+
+        if not clicked:
+            logger.warning("Could not click any reactions button on %s", post_url)
+            return {
+                "url": post_url,
+                "likers": [],
+                "count": 0,
+                "error": "Could not open reactions modal",
+            }
+
+        # Wait for the modal to open.
         try:
             await self._page.wait_for_selector(modal_selector, timeout=8000)
         except PlaywrightTimeoutError:
             logger.debug("Reactions modal did not open on %s", post_url)
-            return {"url": post_url, "likers": [], "count": 0, "error": "Reactions modal did not open"}
+            return {
+                "url": post_url,
+                "likers": [],
+                "count": 0,
+                "error": "Reactions modal did not open",
+            }
 
-        # Scroll the modal to load all likers
+        # Scroll any plausible modal container to load all likers.
         await self._page.evaluate(
-            """async ({pauseTime, maxScrolls}) => {
-                const modal = document.querySelector(
-                    'dialog[open] .artdeco-modal__artdeco-modal__content, '
-                    + '.artdeco-modal__content, dialog[open]'
-                );
-                if (!modal) return;
-                for (let i = 0; i < maxScrolls; i++) {
-                    const prev = modal.scrollHeight;
-                    modal.scrollTop = modal.scrollHeight;
-                    await new Promise(r => setTimeout(r, pauseTime * 1000));
-                    if (modal.scrollHeight === prev) break;
+            """async ({modalSelector, scrollTargetSelector, pauseMs, maxScrolls}) => {
+                const modalRoot = document.querySelector(modalSelector);
+                if (!modalRoot) return;
+
+                const targetCandidates = [
+                    modalRoot,
+                    ...modalRoot.querySelectorAll(scrollTargetSelector),
+                ];
+
+                const scrollTargets = targetCandidates.filter((node, index, arr) => {
+                    if (!node || arr.indexOf(node) !== index) return false;
+                    return node.scrollHeight > node.clientHeight || node === modalRoot;
+                });
+
+                for (const target of scrollTargets) {
+                    let stagnant = 0;
+                    for (let i = 0; i < maxScrolls; i++) {
+                        const prevTop = target.scrollTop;
+                        const prevHeight = target.scrollHeight;
+                        target.scrollTop = target.scrollHeight;
+                        target.dispatchEvent(new Event('scroll', { bubbles: true }));
+                        await new Promise(resolve => setTimeout(resolve, pauseMs));
+                        const sameTop = target.scrollTop === prevTop;
+                        const sameHeight = target.scrollHeight === prevHeight;
+                        if (sameTop && sameHeight) {
+                            stagnant += 1;
+                            if (stagnant >= 2) break;
+                        } else {
+                            stagnant = 0;
+                        }
+                    }
                 }
             }""",
-            {"pauseTime": 1.0, "maxScrolls": 20},
+            {
+                "modalSelector": modal_selector,
+                "scrollTargetSelector": scroll_target_selector,
+                "pauseMs": 900,
+                "maxScrolls": 40,
+            },
         )
 
-        # Extract liker names and profile URLs from the modal
+        # Extract liker names and profile URLs from the modal. Prefer profile
+        # links, then fall back to nearby accessible labels when innerText is
+        # sparse.
         likers = await self._page.evaluate(
-            """() => {
+            """({modalSelector, linkSelector}) => {
                 const modal = document.querySelector(
-                    '.artdeco-modal__content, dialog[open]'
+                    modalSelector
                 );
                 if (!modal) return [];
 
                 const results = [];
                 const seen = new Set();
 
-                const links = modal.querySelectorAll('a[href*="/in/"]');
+                const links = modal.querySelectorAll(linkSelector);
                 links.forEach(link => {
                     const href = link.getAttribute('href') || '';
                     const match = href.match(/\\/in\\/([^/?#]+)/);
                     if (!match) return;
                     const username = match[1];
                     if (seen.has(username)) return;
-                    seen.add(username);
 
-                    const name = (link.innerText || link.textContent || '').trim();
-                    if (name) {
-                        results.push({
-                            name: name,
-                            username: username,
-                            url: 'https://www.linkedin.com/in/' + username + '/'
-                        });
-                    }
+                    const textParts = [
+                        link.innerText,
+                        link.textContent,
+                        link.getAttribute('aria-label'),
+                        link.querySelector('span[aria-hidden="true"]')?.textContent,
+                        link.querySelector('.update-components-actor__name')?.textContent,
+                        link.closest('li, div, article')?.querySelector('span[dir="ltr"]')?.textContent,
+                    ];
+                    const name = (textParts.find(value => (value || '').trim()) || '').trim();
+                    if (!name) return;
+
+                    seen.add(username);
+                    results.push({
+                        name,
+                        username,
+                        url: 'https://www.linkedin.com/in/' + username + '/',
+                    });
                 });
                 return results;
-            }"""
+            }""",
+            {"modalSelector": modal_selector, "linkSelector": link_selector},
         )
 
         return {
