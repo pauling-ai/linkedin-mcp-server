@@ -419,6 +419,113 @@ class TestNavigationDiagnostics:
         mock_page.remove_listener.assert_called_once()
 
 
+class TestPostLikersScraping:
+    async def test_scrape_post_likers_uses_fallback_reaction_selectors(self, mock_page):
+        extractor = LinkedInExtractor(mock_page)
+        extractor._goto_with_auth_checks = AsyncMock()
+
+        hidden_button = MagicMock()
+        hidden_button.is_visible = AsyncMock(return_value=False)
+        hidden_button.scroll_into_view_if_needed = AsyncMock()
+        hidden_button.click = AsyncMock()
+
+        visible_button = MagicMock()
+        visible_button.is_visible = AsyncMock(return_value=True)
+        visible_button.scroll_into_view_if_needed = AsyncMock()
+        visible_button.click = AsyncMock()
+
+        empty_locator = MagicMock()
+        empty_locator.count = AsyncMock(return_value=0)
+
+        populated_locator = MagicMock()
+        populated_locator.count = AsyncMock(return_value=2)
+        populated_locator.nth = MagicMock(side_effect=[hidden_button, visible_button])
+
+        def locator_side_effect(selector: str):
+            if selector == "button[data-reaction-details]":
+                return empty_locator
+            if selector == "button.social-details-social-counts__count-value-hover":
+                return populated_locator
+            return empty_locator
+
+        mock_page.locator.side_effect = locator_side_effect
+        mock_page.evaluate = AsyncMock(
+            side_effect=[
+                None,
+                [
+                    {
+                        "name": "Jane Doe",
+                        "username": "janedoe",
+                        "url": "https://www.linkedin.com/in/janedoe/",
+                    }
+                ],
+            ]
+        )
+
+        result = await extractor.scrape_post_likers(
+            "https://www.linkedin.com/feed/update/urn:li:activity:123/"
+        )
+
+        extractor._goto_with_auth_checks.assert_awaited_once()
+        mock_page.wait_for_selector.assert_any_await(
+            "button[data-reaction-details], button.social-details-social-counts__count-value-hover, button.social-details-social-counts__count-value, button.social-details-reactors-facepile__reactions-modal-button, button[aria-label*=' others'], button[aria-label*=' reactions']",
+            timeout=10000,
+        )
+        mock_page.wait_for_selector.assert_any_await(
+            "div[role='dialog'], dialog[open], .artdeco-modal, .artdeco-modal__content",
+            timeout=8000,
+        )
+        visible_button.scroll_into_view_if_needed.assert_awaited_once()
+        visible_button.click.assert_awaited_once_with(timeout=5000)
+        assert result["count"] == 1
+        assert result["likers"][0]["username"] == "janedoe"
+
+    async def test_scrape_post_likers_extraction_script_includes_name_fallbacks(
+        self, mock_page
+    ):
+        extractor = LinkedInExtractor(mock_page)
+        extractor._goto_with_auth_checks = AsyncMock()
+
+        trigger = MagicMock()
+        trigger.is_visible = AsyncMock(return_value=True)
+        trigger.scroll_into_view_if_needed = AsyncMock()
+        trigger.click = AsyncMock()
+
+        trigger_locator = MagicMock()
+        trigger_locator.count = AsyncMock(return_value=1)
+        trigger_locator.nth = MagicMock(return_value=trigger)
+
+        empty_locator = MagicMock()
+        empty_locator.count = AsyncMock(return_value=0)
+
+        def locator_side_effect(selector: str):
+            if selector == "button[data-reaction-details]":
+                return trigger_locator
+            return empty_locator
+
+        mock_page.locator.side_effect = locator_side_effect
+        mock_page.evaluate = AsyncMock(side_effect=[None, []])
+
+        await extractor.scrape_post_likers(
+            "https://www.linkedin.com/feed/update/urn:li:activity:123/"
+        )
+
+        extraction_call = mock_page.evaluate.await_args_list[1]
+        script = extraction_call.args[0]
+        options = extraction_call.args[1]
+
+        assert "link.getAttribute('aria-label')" in script
+        assert "span[aria-hidden=\"true\"]" in script
+        assert ".update-components-actor__name" in script
+        assert "span[dir=\"ltr\"]" in script
+        assert options["modalSelector"] == (
+            "div[role='dialog'], dialog[open], .artdeco-modal, .artdeco-modal__content"
+        )
+        assert options["linkSelector"] == (
+            "a[href*='/in/'], a[data-test-app-aware-link][href*='/in/']"
+        )
+
+
 class TestScrapePersonUrls:
     """Test that scrape_person visits the correct URLs per section set."""
 

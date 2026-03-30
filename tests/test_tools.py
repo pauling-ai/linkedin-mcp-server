@@ -25,10 +25,44 @@ def _make_mock_extractor(scrape_result: dict) -> MagicMock:
     mock.scrape_job = AsyncMock(return_value=scrape_result)
     mock.search_jobs = AsyncMock(return_value=scrape_result)
     mock.search_people = AsyncMock(return_value=scrape_result)
+    mock.scrape_post_likers = AsyncMock(return_value=scrape_result)
     mock.extract_page = AsyncMock(
         return_value=ExtractedSection(text="some text", references=[])
     )
     return mock
+
+
+class TestPostTools:
+    async def test_get_post_likers(self, mock_context):
+        expected = {
+            "url": "https://www.linkedin.com/feed/update/urn:li:activity:123/",
+            "likers": [
+                {
+                    "name": "Jane Doe",
+                    "username": "janedoe",
+                    "url": "https://www.linkedin.com/in/janedoe/",
+                }
+            ],
+            "count": 1,
+        }
+        mock_extractor = _make_mock_extractor(expected)
+
+        from linkedin_mcp_server.tools.post import register_post_tools
+
+        mcp = FastMCP("test")
+        register_post_tools(mcp)
+
+        tool_fn = await get_tool_fn(mcp, "get_post_likers")
+        result = await tool_fn(
+            "https://www.linkedin.com/feed/update/urn:li:activity:123/",
+            mock_context,
+            extractor=mock_extractor,
+        )
+
+        assert result == expected
+        mock_extractor.scrape_post_likers.assert_awaited_once_with(
+            "https://www.linkedin.com/feed/update/urn:li:activity:123/"
+        )
 
 
 class TestPersonTool:
