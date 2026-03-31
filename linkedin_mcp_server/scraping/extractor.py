@@ -1280,6 +1280,108 @@ class LinkedInExtractor:
         )
         return result
 
+    async def scrape_last_post(self, username: str) -> dict[str, Any]:
+        """Scrape the most recent organic post from a person's activity feed.
+
+        Visits the person's profile first (natural navigation, no data returned),
+        then pivots to the Posts-only activity tab (/recent-activity/posts/) which
+        filters out likes, comments, and reshares, leaving only the person's own
+        original posts. Extracts structured data from the first post container.
+
+        Returns:
+            {url, post: {text, posted_at, post_url, urn}} on success.
+            {url, post: None, error: str} when no post is found.
+        """
+        # Visit the profile first for natural navigation flow.
+        profile_url = f"https://www.linkedin.com/in/{username}/"
+        await self._goto_with_auth_checks(profile_url)
+        await asyncio.sleep(_NAV_DELAY)
+
+        # Pivot to the posts-only activity tab — no profile data returned.
+        url = f"https://www.linkedin.com/in/{username}/recent-activity/posts/"
+        await self._goto_with_auth_checks(url)
+
+        # Activity pages lazy-load — wait for real content before extracting.
+        try:
+            await self._page.wait_for_function(
+                """() => {
+                    const main = document.querySelector('main');
+                    return main && main.innerText.length > 200;
+                }""",
+                timeout=10000,
+            )
+        except PlaywrightTimeoutError:
+            logger.debug("Activity feed content did not appear on %s", url)
+
+        await handle_modal_close(self._page)
+
+        # Scroll just enough to fully render the first post.
+        await scroll_to_bottom(self._page, pause_time=1.0, max_scrolls=3)
+
+        post = await self._page.evaluate(
+            """() => {
+                // Feed post containers carry data-urn="urn:li:activity:XXXXX".
+                const containers = Array.from(
+                    document.querySelectorAll('[data-urn*="urn:li:activity:"]')
+                );
+                if (!containers.length) return null;
+
+                const first = containers[0];
+                const urn = first.getAttribute('data-urn') || null;
+
+                // Post text: try known selectors in order, fall back to the
+                // container's own innerText (minus social counts at the bottom).
+                const textSelectors = [
+                    '.update-components-text',
+                    '.feed-shared-update-v2__description',
+                    '.attributed-text-segment-list__content',
+                    '[class*="commentary"]',
+                ];
+                let textEl = null;
+                for (const sel of textSelectors) {
+                    textEl = first.querySelector(sel);
+                    if (textEl) break;
+                }
+                const text = (textEl || first).innerText?.trim() || '';
+
+                // Permalink: prefer an anchor tag if present, otherwise construct
+                // from the URN. The newest post on the feed often has no anchor yet
+                // (data-urn is set but no /feed/update/ link rendered), so the URN
+                // fallback is the reliable path for the most recent post.
+                const linkEl = first.querySelector(
+                    'a[href*="-activity-"], a[href*="/feed/update/"]'
+                );
+                const postUrl = linkEl
+                    ? (linkEl.href || linkEl.getAttribute('href'))
+                    : (urn ? 'https://www.linkedin.com/feed/update/' + urn + '/' : null);
+
+                // Timestamp from <time> element.
+                const timeEl = first.querySelector('time');
+                const postedAt = timeEl
+                    ? (timeEl.getAttribute('datetime') || timeEl.innerText?.trim() || null)
+                    : null;
+
+                return { text, postUrl, postedAt, urn };
+            }"""
+        )
+
+        if not post or not post.get("text"):
+            return {
+                "url": url,
+                "post": None,
+                "error": "No organic post found — the person may not have any original posts.",
+            }
+
+        return {
+            "url": url,
+            "post": {
+                "text": post["text"],
+                "posted_at": post.get("postedAt"),
+                "post_url": post.get("postUrl"),
+                "urn": post.get("urn"),
+            },
+        }
+
     async def extract_post_urns(self) -> list[str]:
         """Extract activity URNs from the currently loaded page.
 

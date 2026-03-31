@@ -12,29 +12,50 @@ Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerd
 | `get_inbox` | Read recent inbox conversations (supports `unread_only`) |
 | `get_conversation` | Read the full message thread with a specific person |
 | `get_post_likers` | Get the list of people who reacted to a LinkedIn post |
+| `get_last_post` | Get the most recent organic post from a person's profile |
+
+## Detail Mode
+
+All page-scraping tools (`get_person_profile`, `search_people`, `get_company_profile`, `get_company_posts`, `get_job_details`, `search_jobs`) accept a `detail` parameter:
+
+- `"basic"` (default) — truncates each section's raw text to `BASIC_SECTION_MAX_CHARS` (2000 chars). LinkedIn front-loads the most important content (name, headline, location, about), so this captures essentials while staying well within LLM context limits. References, job IDs, and post URNs are always kept.
+- `"full"` — returns the complete raw page text, current behaviour.
+
+If basic mode doesn't return enough information, call the tool again with `detail="full"`.
+
+The truncation limit is a single constant in `linkedin_mcp_server/tools/utils.py`:
+
+```python
+BASIC_SECTION_MAX_CHARS = 2000
+```
 
 ## All Tools
 
 ### People
 | Tool | Description |
 |------|-------------|
-| `get_person_profile` | Get profile info with optional sections: `experience`, `education`, `interests`, `honors`, `languages`, `contact_info`, `posts` |
-| `search_people` | Search for people by keywords and optional location |
+| `get_person_profile` | Get profile info with optional sections: `experience`, `education`, `interests`, `honors`, `languages`, `contact_info`, `posts`. Supports `detail` param. |
+| `search_people` | Search for people by keywords and optional location. Supports `detail` param. |
+| `get_last_post` | Get the most recent organic post from a person (visits profile first, then Posts activity tab; returns text, timestamp, URL, and URN) |
 | `send_connection_request` | Send a connection request, with or without a note (~300 char limit); handles profiles where Connect is in the More dropdown |
 | `send_message` | Send a message to a 1st-degree connection (also used to reply to existing threads) |
+| `follow_person` | Follow a person's profile |
+| `check_follow` | Check whether you are following a person |
+| `check_connection` | Check whether you are connected to a person |
 
 ### Companies
 | Tool | Description |
 |------|-------------|
-| `get_company_profile` | Get company info with optional sections: `posts`, `jobs` |
-| `get_company_posts` | Get recent posts from a company's feed; returns post URNs for further use |
+| `get_company_profile` | Get company info with optional sections: `posts`, `jobs`. Supports `detail` param. |
+| `get_company_posts` | Get recent posts from a company's feed; returns post URNs for further use. Supports `detail` param. |
 | `follow_company` | Follow a company page |
+| `check_follow_company` | Check whether you are following a company |
 
 ### Jobs
 | Tool | Description |
 |------|-------------|
-| `search_jobs` | Search for jobs by keywords and optional location |
-| `get_job_details` | Get full details of a specific job posting |
+| `search_jobs` | Search for jobs by keywords and optional location. Supports `detail` param. |
+| `get_job_details` | Get full details of a specific job posting. Supports `detail` param. |
 
 ### Messaging
 | Tool | Description |
@@ -46,6 +67,7 @@ Personal fork of [stickerdaniel/linkedin-mcp-server](https://github.com/stickerd
 | Tool | Description |
 |------|-------------|
 | `get_post_likers` | Get the list of people who reacted to a post (by feed URL or post URN) |
+| `get_last_post` | Get the most recent organic post from a person (no likes, no reshares) |
 
 ### Session
 | Tool | Description |

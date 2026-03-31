@@ -91,6 +91,51 @@ def register_person_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         timeout=TOOL_TIMEOUT_SECONDS,
+        title="Get Last Post",
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+        tags={"person", "scraping"},
+    )
+    async def get_last_post(
+        linkedin_username: str,
+        ctx: Context,
+        extractor: LinkedInExtractor = Depends(get_extractor),
+    ) -> dict[str, Any]:
+        """
+        Get the most recent organic post from a person's LinkedIn profile.
+
+        Navigates to the Posts-only activity tab, which filters out likes,
+        comments, and reshares — returning only the person's own original posts.
+
+        Args:
+            linkedin_username: LinkedIn username (e.g., "stickerdaniel", "williamhgates")
+            ctx: FastMCP context for progress reporting
+
+        Returns:
+            Dict with url and post. post contains:
+            - text: full body text of the post
+            - posted_at: ISO timestamp or relative string (e.g. "2d")
+            - post_url: permalink URL to the post
+            - urn: activity URN (usable with get_post_likers)
+            post is None if the person has no original posts.
+        """
+        try:
+            logger.info("Scraping last post: %s", linkedin_username)
+
+            await ctx.report_progress(
+                progress=0, total=100, message="Loading activity feed"
+            )
+
+            result = await extractor.scrape_last_post(linkedin_username)
+
+            await ctx.report_progress(progress=100, total=100, message="Complete")
+
+            return result
+
+        except Exception as e:
+            raise_tool_error(e, "get_last_post")  # NoReturn
+
+    @mcp.tool(
+        timeout=TOOL_TIMEOUT_SECONDS,
         title="Search People",
         annotations={"readOnlyHint": True, "openWorldHint": True},
         tags={"person", "search"},
