@@ -103,8 +103,9 @@ def register_person_tools(mcp: FastMCP) -> None:
         """
         Get the most recent organic post from a person's LinkedIn profile.
 
-        Navigates to the Posts-only activity tab, which filters out likes,
-        comments, and reshares — returning only the person's own original posts.
+        Visits the profile then navigates to the full activity feed. Reshares
+        and like/comment activity are filtered out in the browser, returning
+        only the person's own original posts.
 
         Args:
             linkedin_username: LinkedIn username (e.g., "stickerdaniel", "williamhgates")

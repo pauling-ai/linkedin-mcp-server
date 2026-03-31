@@ -1284,9 +1284,10 @@ class LinkedInExtractor:
         """Scrape the most recent organic post from a person's activity feed.
 
         Visits the person's profile first (natural navigation, no data returned),
-        then pivots to the Posts-only activity tab (/recent-activity/posts/) which
-        filters out likes, comments, and reshares, leaving only the person's own
-        original posts. Extracts structured data from the first post container.
+        then navigates to /recent-activity/all/. Reshares and like/comment activity
+        are filtered out in JS (reshares contain a nested data-urn child; like/comment
+        items carry a mini-update component), leaving only original posts.
+        Extracts structured data from the first matching post container.
 
         Returns:
             {url, post: {text, posted_at, post_url, urn}} on success.
@@ -1297,8 +1298,9 @@ class LinkedInExtractor:
         await self._goto_with_auth_checks(profile_url)
         await asyncio.sleep(_NAV_DELAY)
 
-        # Pivot to the posts-only activity tab — no profile data returned.
-        url = f"https://www.linkedin.com/in/{username}/recent-activity/posts/"
+        # Use /recent-activity/all/ — the /posts/ tab is a client-side filter
+        # and doesn't render reliably as a direct navigation target.
+        url = f"https://www.linkedin.com/in/{username}/recent-activity/all/"
         await self._goto_with_auth_checks(url)
 
         # Activity pages lazy-load — wait for real content before extracting.
@@ -1315,7 +1317,7 @@ class LinkedInExtractor:
 
         await handle_modal_close(self._page)
 
-        # Scroll just enough to fully render the first post.
+        # Scroll just enough to fully render the first few posts.
         await scroll_to_bottom(self._page, pause_time=1.0, max_scrolls=3)
 
         post = await self._page.evaluate(
@@ -1326,11 +1328,21 @@ class LinkedInExtractor:
                 );
                 if (!containers.length) return null;
 
-                const first = containers[0];
+                // Filter to organic posts only. Reshares contain the original post
+                // as a nested data-urn child; likes/comments have a reshare-style
+                // mini-update component. Skip both.
+                const organic = containers.filter(c => {
+                    if (c.querySelector('[data-urn*="urn:li:activity:"]')) return false;
+                    if (c.querySelector('.update-components-mini-update-v2')) return false;
+                    return true;
+                });
+                if (!organic.length) return null;
+
+                const first = organic[0];
                 const urn = first.getAttribute('data-urn') || null;
 
                 // Post text: try known selectors in order, fall back to the
-                // container's own innerText (minus social counts at the bottom).
+                // container's own innerText.
                 const textSelectors = [
                     '.update-components-text',
                     '.feed-shared-update-v2__description',
