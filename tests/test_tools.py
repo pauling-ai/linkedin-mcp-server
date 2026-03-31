@@ -1674,3 +1674,240 @@ class TestToolTimeouts:
             tool = await mcp.get_tool(name)
             assert tool is not None
             assert tool.timeout == TOOL_TIMEOUT_SECONDS
+
+
+class TestDetailMode:
+    """Integration tests for the detail parameter across all page-returning tools."""
+
+    _LONG_TEXT = "x" * 5000
+
+    def _make_extractor(self, sections: dict) -> MagicMock:
+        result = {"url": "https://www.linkedin.com/test/", "sections": sections}
+        mock = _make_mock_extractor(result)
+        mock.extract_page = AsyncMock(
+            return_value=ExtractedSection(text=sections.get("posts", ""), references=[])
+        )
+        mock.extract_post_urns = AsyncMock(return_value=[])
+        return mock
+
+    # ── get_person_profile ──────────────────────────────────────────────────
+
+    async def test_get_person_profile_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.person import register_person_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"main_profile": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_person_profile")
+
+        result = await tool_fn("foo", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["main_profile"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_get_person_profile_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mock_extractor = self._make_extractor({"main_profile": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_person_profile")
+
+        result = await tool_fn("foo", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["main_profile"]) == len(self._LONG_TEXT)
+
+    async def test_get_person_profile_default_is_basic(self, mock_context):
+        from linkedin_mcp_server.tools.person import register_person_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"main_profile": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_person_profile")
+
+        result = await tool_fn("foo", mock_context, extractor=mock_extractor)
+        assert len(result["sections"]["main_profile"]) == BASIC_SECTION_MAX_CHARS
+
+    # ── search_people ───────────────────────────────────────────────────────
+
+    async def test_search_people_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.person import register_person_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"search_results": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "search_people")
+
+        result = await tool_fn("engineer", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["search_results"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_search_people_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mock_extractor = self._make_extractor({"search_results": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "search_people")
+
+        result = await tool_fn("engineer", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["search_results"]) == len(self._LONG_TEXT)
+
+    # ── get_company_profile ─────────────────────────────────────────────────
+
+    async def test_get_company_profile_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.company import register_company_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"about": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_company_profile")
+
+        result = await tool_fn("acme", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["about"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_get_company_profile_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mock_extractor = self._make_extractor({"about": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_company_profile")
+
+        result = await tool_fn("acme", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["about"]) == len(self._LONG_TEXT)
+
+    # ── get_company_posts ───────────────────────────────────────────────────
+
+    async def test_get_company_posts_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.company import register_company_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = MagicMock()
+        mock_extractor.extract_page = AsyncMock(
+            return_value=ExtractedSection(text="p" * 5000, references=[])
+        )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_company_posts")
+
+        result = await tool_fn("acme", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["posts"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_get_company_posts_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mock_extractor = MagicMock()
+        mock_extractor.extract_page = AsyncMock(
+            return_value=ExtractedSection(text="p" * 5000, references=[])
+        )
+        mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_company_posts")
+
+        result = await tool_fn("acme", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["posts"]) == 5000
+
+    async def test_get_company_posts_basic_keeps_post_urns(self, mock_context):
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mock_extractor = MagicMock()
+        mock_extractor.extract_page = AsyncMock(
+            return_value=ExtractedSection(text="p" * 5000, references=[])
+        )
+        mock_extractor.extract_post_urns = AsyncMock(
+            return_value=["urn:li:activity:111", "urn:li:activity:222"]
+        )
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_company_posts")
+
+        result = await tool_fn("acme", mock_context, detail="basic", extractor=mock_extractor)
+        assert result["post_urns"] == ["urn:li:activity:111", "urn:li:activity:222"]
+
+    # ── get_job_details ─────────────────────────────────────────────────────
+
+    async def test_get_job_details_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.job import register_job_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"job_posting": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_job_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_job_details")
+
+        result = await tool_fn("12345", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["job_posting"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_get_job_details_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.job import register_job_tools
+
+        mock_extractor = self._make_extractor({"job_posting": self._LONG_TEXT})
+        mcp = FastMCP("test")
+        register_job_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_job_details")
+
+        result = await tool_fn("12345", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["job_posting"]) == len(self._LONG_TEXT)
+
+    # ── search_jobs ─────────────────────────────────────────────────────────
+
+    async def test_search_jobs_basic_truncates(self, mock_context):
+        from linkedin_mcp_server.tools.job import register_job_tools
+        from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS
+
+        mock_extractor = self._make_extractor({"search_results": self._LONG_TEXT})
+        mock_extractor.search_jobs = AsyncMock(
+            return_value={
+                "url": "https://www.linkedin.com/jobs/search/",
+                "sections": {"search_results": self._LONG_TEXT},
+                "job_ids": ["1", "2", "3"],
+            }
+        )
+        mcp = FastMCP("test")
+        register_job_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "search_jobs")
+
+        result = await tool_fn("engineer", mock_context, detail="basic", extractor=mock_extractor)
+        assert len(result["sections"]["search_results"]) == BASIC_SECTION_MAX_CHARS
+
+    async def test_search_jobs_basic_keeps_job_ids(self, mock_context):
+        from linkedin_mcp_server.tools.job import register_job_tools
+
+        mock_extractor = self._make_extractor({"search_results": self._LONG_TEXT})
+        mock_extractor.search_jobs = AsyncMock(
+            return_value={
+                "url": "https://www.linkedin.com/jobs/search/",
+                "sections": {"search_results": self._LONG_TEXT},
+                "job_ids": ["111", "222", "333"],
+            }
+        )
+        mcp = FastMCP("test")
+        register_job_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "search_jobs")
+
+        result = await tool_fn("engineer", mock_context, detail="basic", extractor=mock_extractor)
+        assert result["job_ids"] == ["111", "222", "333"]
+
+    async def test_search_jobs_full_untruncated(self, mock_context):
+        from linkedin_mcp_server.tools.job import register_job_tools
+
+        mock_extractor = self._make_extractor({"search_results": self._LONG_TEXT})
+        mock_extractor.search_jobs = AsyncMock(
+            return_value={
+                "url": "https://www.linkedin.com/jobs/search/",
+                "sections": {"search_results": self._LONG_TEXT},
+                "job_ids": [],
+            }
+        )
+        mcp = FastMCP("test")
+        register_job_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "search_jobs")
+
+        result = await tool_fn("engineer", mock_context, detail="full", extractor=mock_extractor)
+        assert len(result["sections"]["search_results"]) == len(self._LONG_TEXT)

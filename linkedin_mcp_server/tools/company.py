@@ -7,7 +7,7 @@ with configurable section selection.
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
@@ -17,6 +17,7 @@ from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_company_sections
 from linkedin_mcp_server.scraping.link_metadata import Reference
+from linkedin_mcp_server.tools.utils import apply_detail_filter
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ def register_company_tools(mcp: FastMCP) -> None:
         company_name: str,
         ctx: Context,
         sections: str | None = None,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -47,6 +49,11 @@ def register_company_tools(mcp: FastMCP) -> None:
                 Available sections: posts, jobs
                 Examples: "posts", "posts,jobs"
                 Default (None) scrapes only the about page.
+            detail: Controls how much text is returned per section.
+                "basic" (default): truncates each section to BASIC_SECTION_MAX_CHARS.
+                "full": returns the complete raw page text for every section.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), and optional references.
@@ -57,9 +64,10 @@ def register_company_tools(mcp: FastMCP) -> None:
             requested, unknown = parse_company_sections(sections)
 
             logger.info(
-                "Scraping company: %s (sections=%s)",
+                "Scraping company: %s (sections=%s, detail=%s)",
                 company_name,
                 sections,
+                detail,
             )
 
             await ctx.report_progress(
@@ -67,6 +75,7 @@ def register_company_tools(mcp: FastMCP) -> None:
             )
 
             result = await extractor.scrape_company(company_name, requested)
+            result = apply_detail_filter(result, detail)
 
             if unknown:
                 result["unknown_sections"] = unknown
@@ -87,6 +96,7 @@ def register_company_tools(mcp: FastMCP) -> None:
     async def get_company_posts(
         company_name: str,
         ctx: Context,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -95,13 +105,19 @@ def register_company_tools(mcp: FastMCP) -> None:
         Args:
             company_name: LinkedIn company name (e.g., "docker", "anthropic", "microsoft")
             ctx: FastMCP context for progress reporting
+            detail: Controls how much text is returned.
+                "basic" (default): truncates section text to BASIC_SECTION_MAX_CHARS.
+                    post_urns and references are always kept.
+                "full": returns the complete raw page text.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), and optional references.
             The LLM should parse the raw text to extract individual posts.
         """
         try:
-            logger.info("Scraping company posts: %s", company_name)
+            logger.info("Scraping company posts: %s (detail=%s)", company_name, detail)
 
             await ctx.report_progress(
                 progress=0, total=100, message="Starting company posts scrape"
@@ -133,7 +149,8 @@ def register_company_tools(mcp: FastMCP) -> None:
                 result["references"] = references
             if section_errors:
                 result["section_errors"] = section_errors
-            return result
+
+            return apply_detail_filter(result, detail)
 
         except Exception as e:
             raise_tool_error(e, "get_company_posts")  # NoReturn

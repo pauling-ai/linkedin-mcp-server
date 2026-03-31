@@ -7,7 +7,7 @@ with configurable section selection.
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
@@ -16,6 +16,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_person_sections
+from linkedin_mcp_server.tools.utils import apply_detail_filter
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ def register_person_tools(mcp: FastMCP) -> None:
         linkedin_username: str,
         ctx: Context,
         sections: str | None = None,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -46,6 +48,13 @@ def register_person_tools(mcp: FastMCP) -> None:
                 Available sections: experience, education, interests, honors, languages, contact_info, posts
                 Examples: "experience,education", "contact_info", "honors,languages", "posts"
                 Default (None) scrapes only the main profile page.
+            detail: Controls how much text is returned per section.
+                "basic" (default): truncates each section to BASIC_SECTION_MAX_CHARS —
+                    enough for name, headline, location, and about summary.
+                    Use this when processing many profiles to stay within context limits.
+                "full": returns the complete raw page text for every section.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), and optional references.
@@ -57,9 +66,10 @@ def register_person_tools(mcp: FastMCP) -> None:
             requested, unknown = parse_person_sections(sections)
 
             logger.info(
-                "Scraping profile: %s (sections=%s)",
+                "Scraping profile: %s (sections=%s, detail=%s)",
                 linkedin_username,
                 sections,
+                detail,
             )
 
             await ctx.report_progress(
@@ -67,6 +77,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             )
 
             result = await extractor.scrape_person(linkedin_username, requested)
+            result = apply_detail_filter(result, detail)
 
             if unknown:
                 result["unknown_sections"] = unknown
@@ -88,6 +99,7 @@ def register_person_tools(mcp: FastMCP) -> None:
         keywords: str,
         ctx: Context,
         location: str | None = None,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -97,6 +109,12 @@ def register_person_tools(mcp: FastMCP) -> None:
             keywords: Search keywords (e.g., "software engineer", "recruiter at Google")
             ctx: FastMCP context for progress reporting
             location: Optional location filter (e.g., "New York", "Remote")
+            detail: Controls how much text is returned.
+                "basic" (default): truncates section text to BASIC_SECTION_MAX_CHARS.
+                    References (profile links) are always kept for follow-up calls.
+                "full": returns the complete raw page text.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), and optional references.
@@ -104,9 +122,10 @@ def register_person_tools(mcp: FastMCP) -> None:
         """
         try:
             logger.info(
-                "Searching people: keywords='%s', location='%s'",
+                "Searching people: keywords='%s', location='%s', detail=%s",
                 keywords,
                 location,
+                detail,
             )
 
             await ctx.report_progress(
@@ -114,6 +133,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             )
 
             result = await extractor.search_people(keywords, location)
+            result = apply_detail_filter(result, detail)
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 

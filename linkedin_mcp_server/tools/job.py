@@ -5,7 +5,7 @@ Uses innerText extraction for resilient job data capture.
 """
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
@@ -15,6 +15,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor
+from linkedin_mcp_server.tools.utils import apply_detail_filter
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def register_job_tools(mcp: FastMCP) -> None:
     async def get_job_details(
         job_id: str,
         ctx: Context,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -39,13 +41,19 @@ def register_job_tools(mcp: FastMCP) -> None:
         Args:
             job_id: LinkedIn job ID (e.g., "4252026496", "3856789012")
             ctx: FastMCP context for progress reporting
+            detail: Controls how much text is returned.
+                "basic" (default): truncates section text to BASIC_SECTION_MAX_CHARS —
+                    enough for title, company, location, and job summary.
+                "full": returns the complete raw page text including full description.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), and optional references.
             The LLM should parse the raw text to extract job details.
         """
         try:
-            logger.info("Scraping job: %s", job_id)
+            logger.info("Scraping job: %s (detail=%s)", job_id, detail)
 
             await ctx.report_progress(
                 progress=0, total=100, message="Starting job scrape"
@@ -55,7 +63,7 @@ def register_job_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return apply_detail_filter(result, detail)
 
         except Exception as e:
             raise_tool_error(e, "get_job_details")  # NoReturn
@@ -77,6 +85,7 @@ def register_job_tools(mcp: FastMCP) -> None:
         work_type: str | None = None,
         easy_apply: bool = False,
         sort_by: str | None = None,
+        detail: Literal["basic", "full"] = "basic",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -95,6 +104,12 @@ def register_job_tools(mcp: FastMCP) -> None:
             work_type: Filter by work type, comma-separated (on_site, remote, hybrid)
             easy_apply: Only show Easy Apply jobs (default false)
             sort_by: Sort results (date, relevance)
+            detail: Controls how much text is returned.
+                "basic" (default): truncates section text to BASIC_SECTION_MAX_CHARS.
+                    job_ids and references are always kept.
+                "full": returns the complete raw page text.
+                If basic mode doesn't contain the information you need, call this
+                tool again with detail="full" to get the complete page text.
 
         Returns:
             Dict with url, sections (name -> raw text), job_ids (list of
@@ -102,10 +117,11 @@ def register_job_tools(mcp: FastMCP) -> None:
         """
         try:
             logger.info(
-                "Searching jobs: keywords='%s', location='%s', max_pages=%d",
+                "Searching jobs: keywords='%s', location='%s', max_pages=%d, detail=%s",
                 keywords,
                 location,
                 max_pages,
+                detail,
             )
 
             await ctx.report_progress(
@@ -126,7 +142,7 @@ def register_job_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return apply_detail_filter(result, detail)
 
         except Exception as e:
             raise_tool_error(e, "search_jobs")  # NoReturn
