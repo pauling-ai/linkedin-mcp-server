@@ -7,8 +7,11 @@ Implements a simplified two-phase startup:
 """
 
 import asyncio
+import fcntl
 import logging
+import os
 import sys
+from pathlib import Path
 from typing import Literal
 
 import inquirer
@@ -275,6 +278,31 @@ def ensure_authentication_ready() -> None:
         raise CredentialsNotFoundError("Interactive setup was cancelled or failed")
 
 
+def _acquire_instance_lock() -> int:
+    """Acquire a machine-wide exclusive lock to prevent multiple server instances.
+
+    Returns the open file descriptor — keep it alive for the process lifetime.
+    The lock is automatically released when the process exits.
+
+    Raises SystemExit if another instance is already running.
+    """
+    lock_path = Path.home() / ".linkedin-mcp" / "server.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        print(
+            "❌ Another instance of LinkedIn MCP Server is already running on this machine."
+        )
+        sys.exit(1)
+    # Write PID so it's easy to inspect which process holds the lock
+    os.ftruncate(fd, 0)
+    os.write(fd, f"{os.getpid()}\n".encode())
+    return fd
+
+
 def get_version() -> str:
     """Get version from installed metadata with a source fallback."""
     try:
@@ -372,6 +400,7 @@ def main() -> None:
 
         # Phase 2: Server Runtime
         try:
+            _acquire_instance_lock()
             transport = config.server.transport
 
             # Prompt for transport in interactive mode if not explicitly set
