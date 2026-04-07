@@ -2,6 +2,7 @@
 
 import importlib.metadata
 import json
+from pathlib import Path
 from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -40,7 +41,7 @@ def _patch_main_dependencies(
 
 
 def test_main_non_interactive_stdio_has_no_human_stdout(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = _make_config(
         is_interactive=False, transport="stdio", transport_explicitly_set=False
@@ -57,7 +58,7 @@ def test_main_non_interactive_stdio_has_no_human_stdout(
 
 
 def test_main_interactive_prompts_when_transport_not_explicit(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = _make_config(
         is_interactive=True, transport="stdio", transport_explicitly_set=False
@@ -84,7 +85,7 @@ def test_main_interactive_prompts_when_transport_not_explicit(
 
 
 def test_main_explicit_transport_skips_prompt(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = _make_config(
         is_interactive=True, transport="stdio", transport_explicitly_set=True
@@ -106,7 +107,7 @@ def test_main_explicit_transport_skips_prompt(
 
 
 def test_main_streamable_http_passes_host_port_path(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = _make_config(
         is_interactive=False,
@@ -132,6 +133,7 @@ def test_main_streamable_http_passes_host_port_path(
     assert captured.out == ""
 
 
+
 def test_get_version_prefers_installed_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -150,7 +152,7 @@ def test_get_version_prefers_installed_metadata(
 
 
 def test_main_non_interactive_auth_failure_has_no_stdout(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = _make_config(
         is_interactive=False, transport="stdio", transport_explicitly_set=False
