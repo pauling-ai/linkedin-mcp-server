@@ -15,7 +15,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor
-from linkedin_mcp_server.tools.utils import apply_detail_filter
+from linkedin_mcp_server.tools.utils import apply_detail_filter, format_tool_output
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ def register_job_tools(mcp: FastMCP) -> None:
         job_id: str,
         ctx: Context,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -47,10 +48,28 @@ def register_job_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text including full description.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the job posting text
+                    - url: the LinkedIn job URL
+
+                    Use "file" when collecting job details to save or when
+                    processing many job postings in sequence.  The caller can
+                    read the file later if deeper analysis is needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), and optional references.
-            The LLM should parse the raw text to extract job details.
+            When output="inline":
+                Dict with url, sections (name -> raw text), and optional references.
+                The LLM should parse the raw text to extract job details.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the job text), and url.  The full result is in
+                the JSON file at the given path.
         """
         try:
             logger.info("Scraping job: %s (detail=%s)", job_id, detail)
@@ -63,7 +82,9 @@ def register_job_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return apply_detail_filter(result, detail)
+            return format_tool_output(
+                apply_detail_filter(result, detail), "get_job_details", output
+            )
 
         except Exception as e:
             raise_tool_error(e, "get_job_details")  # NoReturn
@@ -86,6 +107,7 @@ def register_job_tools(mcp: FastMCP) -> None:
         easy_apply: bool = False,
         sort_by: str | None = None,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -110,10 +132,30 @@ def register_job_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the search results text
+                    - url: the LinkedIn search URL
+                    - job_ids: list of job ID strings (always included)
+
+                    Use "file" when collecting job search results to save or
+                    when running many searches in sequence.  The caller can
+                    read the file later if deeper analysis is needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), job_ids (list of
-            numeric job ID strings usable with get_job_details), and optional references.
+            When output="inline":
+                Dict with url, sections (name -> raw text), job_ids (list of
+                numeric job ID strings usable with get_job_details), and
+                optional references.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the results), url, and job_ids.  The full result
+                is in the JSON file at the given path.
         """
         try:
             logger.info(
@@ -142,7 +184,9 @@ def register_job_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return apply_detail_filter(result, detail)
+            return format_tool_output(
+                apply_detail_filter(result, detail), "search_jobs", output
+            )
 
         except Exception as e:
             raise_tool_error(e, "search_jobs")  # NoReturn

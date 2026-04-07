@@ -16,7 +16,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_person_sections
-from linkedin_mcp_server.tools.utils import apply_detail_filter
+from linkedin_mcp_server.tools.utils import apply_detail_filter, format_tool_output
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ def register_person_tools(mcp: FastMCP) -> None:
         ctx: Context,
         sections: str | None = None,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -55,12 +56,36 @@ def register_person_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text for every section.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.  The calling LLM receives and processes the
+                    entire payload, which can be thousands of tokens.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the main section text
+                    - url: the LinkedIn profile URL
+                    - (plus any small metadata like unknown_sections)
+
+                    Use "file" when the calling LLM does not need to parse the
+                    full content inline — e.g. collecting profiles to save,
+                    building a report from many pages, or deferring analysis to
+                    a later step.  This avoids spending LLM tokens and context
+                    window on large text blobs that may only need to be stored.
+                    The caller can read the file later if deeper analysis is
+                    needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), and optional references.
-            Sections may be absent if extraction yielded no content for that page.
-            Includes unknown_sections list when unrecognised names are passed.
-            The LLM should parse the raw text in each section.
+            When output="inline":
+                Dict with url, sections (name -> raw text), and optional references.
+                Sections may be absent if extraction yielded no content for that page.
+                Includes unknown_sections list when unrecognised names are passed.
+                The LLM should parse the raw text in each section.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the main section), url, and any small metadata.
+                The full result is in the JSON file at the given path.
         """
         try:
             requested, unknown = parse_person_sections(sections)
@@ -84,7 +109,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return format_tool_output(result, "get_person_profile", output)
 
         except Exception as e:
             raise_tool_error(e, "get_person_profile")  # NoReturn
@@ -98,6 +123,7 @@ def register_person_tools(mcp: FastMCP) -> None:
     async def get_last_post(
         linkedin_username: str,
         ctx: Context,
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -110,14 +136,32 @@ def register_person_tools(mcp: FastMCP) -> None:
         Args:
             linkedin_username: LinkedIn username (e.g., "stickerdaniel", "williamhgates")
             ctx: FastMCP context for progress reporting
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the post text
+                    - url: the activity feed URL
+
+                    Use "file" when the caller just needs to store the post
+                    data or pass it along without parsing it inline.  The
+                    caller can read the file later if deeper analysis is needed.
 
         Returns:
-            Dict with url and post. post contains:
-            - text: full body text of the post
-            - posted_at: ISO timestamp or relative string (e.g. "2d")
-            - post_url: permalink URL to the post
-            - urn: activity URN (usable with get_post_likers)
-            post is None if the person has no original posts.
+            When output="inline":
+                Dict with url and post. post contains:
+                - text: full body text of the post
+                - posted_at: ISO timestamp or relative string (e.g. "2d")
+                - post_url: permalink URL to the post
+                - urn: activity URN (usable with get_post_likers)
+                post is None if the person has no original posts.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the post text), and url.  The full result is in
+                the JSON file at the given path.
         """
         try:
             logger.info("Scraping last post: %s", linkedin_username)
@@ -130,7 +174,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return format_tool_output(result, "get_last_post", output)
 
         except Exception as e:
             raise_tool_error(e, "get_last_post")  # NoReturn
@@ -146,6 +190,7 @@ def register_person_tools(mcp: FastMCP) -> None:
         ctx: Context,
         location: str | None = None,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -161,10 +206,30 @@ def register_person_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the search results text
+                    - url: the LinkedIn search URL
+
+                    Use "file" when collecting search results to save or when
+                    processing many searches in sequence — avoids filling the
+                    LLM context window with large result pages.  The caller can
+                    read the file later if deeper analysis is needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), and optional references.
-            The LLM should parse the raw text to extract individual people and their profiles.
+            When output="inline":
+                Dict with url, sections (name -> raw text), and optional references.
+                The LLM should parse the raw text to extract individual people and
+                their profiles.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the results), and url.  The full result is in the
+                JSON file at the given path.
         """
         try:
             logger.info(
@@ -183,7 +248,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return format_tool_output(result, "search_people", output)
 
         except Exception as e:
             raise_tool_error(e, "search_people")  # NoReturn

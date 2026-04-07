@@ -6,7 +6,7 @@ Read inbox conversations and individual message threads.
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
@@ -15,6 +15,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor
+from linkedin_mcp_server.tools.utils import format_tool_output
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def register_messaging_tools(mcp: FastMCP) -> None:
     async def get_inbox(
         ctx: Context,
         unread_only: bool = False,
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -39,15 +41,33 @@ def register_messaging_tools(mcp: FastMCP) -> None:
         Args:
             ctx: FastMCP context for progress reporting
             unread_only: If True, return only unread conversations.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: conversation count and first few contact names
+
+                    Use "file" when exporting the inbox or processing many
+                    conversations without needing to parse each one inline.
+                    The caller can read the file later if deeper analysis is
+                    needed.
 
         Returns:
-            Dict with conversations list. Each conversation has:
-            - name: display name of the other person
-            - username: LinkedIn username (if extractable from thread URL)
-            - preview: last message snippet
-            - timestamp: relative time string (e.g. "2h", "Mar 15")
-            - unread: bool
-            - thread_url: relative URL to the thread (e.g. "/messaging/thread/2-abc123/")
+            When output="inline":
+                Dict with conversations list. Each conversation has:
+                - name: display name of the other person
+                - username: LinkedIn username (if extractable from thread URL)
+                - preview: last message snippet
+                - timestamp: relative time string (e.g. "2h", "Mar 15")
+                - unread: bool
+                - thread_url: relative URL to the thread (e.g. "/messaging/thread/2-abc123/")
+            When output="file":
+                Dict with output="file", file (absolute path), and preview
+                (conversation count and first few names).  The full conversation
+                list is in the JSON file at the given path.
         """
         try:
             from linkedin_mcp_server.drivers.browser import get_or_create_browser
@@ -132,7 +152,9 @@ def register_messaging_tools(mcp: FastMCP) -> None:
                 enriched = [c for c in enriched if c.get("unread")]
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
-            return {"conversations": enriched}
+            return format_tool_output(
+                {"conversations": enriched}, "get_inbox", output
+            )
 
         except Exception as e:
             raise_tool_error(e, "get_inbox")  # NoReturn
@@ -146,6 +168,7 @@ def register_messaging_tools(mcp: FastMCP) -> None:
     async def get_conversation(
         linkedin_username: str,
         ctx: Context,
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -156,10 +179,28 @@ def register_messaging_tools(mcp: FastMCP) -> None:
 
         Args:
             linkedin_username: LinkedIn username (e.g., "jtordable", "williamhgates")
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: message count and the latest message snippet
+
+                    Use "file" when exporting a conversation or when the caller
+                    only needs to store the thread without parsing every message
+                    inline.  The caller can read the file later if deeper
+                    analysis is needed.
 
         Returns:
-            Dict with linkedin_username, profile_url, and messages list.
-            Each message has: sender ("me" or display name), text, and timestamp.
+            When output="inline":
+                Dict with linkedin_username, profile_url, and messages list.
+                Each message has: sender ("me" or display name), text, and timestamp.
+            When output="file":
+                Dict with output="file", file (absolute path), and preview
+                (message count and latest message snippet).  The full message
+                list is in the JSON file at the given path.
         """
         try:
             from linkedin_mcp_server.drivers.browser import get_or_create_browser
@@ -245,18 +286,26 @@ def register_messaging_tools(mcp: FastMCP) -> None:
                     linkedin_username,
                     len(raw),
                 )
-                return {
-                    "linkedin_username": linkedin_username,
-                    "profile_url": profile_url,
-                    "messages_raw": raw,
-                }
+                return format_tool_output(
+                    {
+                        "linkedin_username": linkedin_username,
+                        "profile_url": profile_url,
+                        "messages_raw": raw,
+                    },
+                    "get_conversation",
+                    output,
+                )
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
-            return {
-                "linkedin_username": linkedin_username,
-                "profile_url": profile_url,
-                "messages": messages,
-            }
+            return format_tool_output(
+                {
+                    "linkedin_username": linkedin_username,
+                    "profile_url": profile_url,
+                    "messages": messages,
+                },
+                "get_conversation",
+                output,
+            )
 
         except Exception as e:
             logger.exception("get_conversation: unhandled exception for %s", linkedin_username)

@@ -17,7 +17,7 @@ from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_company_sections
 from linkedin_mcp_server.scraping.link_metadata import Reference
-from linkedin_mcp_server.tools.utils import apply_detail_filter
+from linkedin_mcp_server.tools.utils import apply_detail_filter, format_tool_output
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ def register_company_tools(mcp: FastMCP) -> None:
         ctx: Context,
         sections: str | None = None,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -54,11 +55,32 @@ def register_company_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text for every section.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the main section text
+                    - url: the LinkedIn company URL
+                    - (plus any small metadata like unknown_sections)
+
+                    Use "file" when the calling LLM does not need to parse the
+                    full content inline — e.g. collecting company data to save,
+                    building a report from many pages, or deferring analysis.
+                    The caller can read the file later if deeper analysis is
+                    needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), and optional references.
-            Includes unknown_sections list when unrecognised names are passed.
-            The LLM should parse the raw text in each section.
+            When output="inline":
+                Dict with url, sections (name -> raw text), and optional references.
+                Includes unknown_sections list when unrecognised names are passed.
+                The LLM should parse the raw text in each section.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the main section), url, and any small metadata.
+                The full result is in the JSON file at the given path.
         """
         try:
             requested, unknown = parse_company_sections(sections)
@@ -82,7 +104,7 @@ def register_company_tools(mcp: FastMCP) -> None:
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
 
-            return result
+            return format_tool_output(result, "get_company_profile", output)
 
         except Exception as e:
             raise_tool_error(e, "get_company_profile")  # NoReturn
@@ -97,6 +119,7 @@ def register_company_tools(mcp: FastMCP) -> None:
         company_name: str,
         ctx: Context,
         detail: Literal["basic", "full"] = "basic",
+        output: Literal["inline", "file"] = "inline",
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -111,10 +134,30 @@ def register_company_tools(mcp: FastMCP) -> None:
                 "full": returns the complete raw page text.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
+            output: Controls how the scraped data is delivered back to the caller.
+                "inline" (default): the full result dict is returned directly in
+                    the MCP response.
+                "file": the full result is saved as a JSON file in the current
+                    working directory (the caller's project directory), and only
+                    a lightweight summary is returned.  The summary contains:
+                    - file: absolute path to the JSON file
+                    - preview: first ~200 characters of the posts section text
+                    - url: the LinkedIn company posts URL
+                    - post_urns: list of post URNs (always included if present)
+
+                    Use "file" when collecting company posts to save or when
+                    processing many companies in sequence.  The caller can read
+                    the file later if deeper analysis is needed.
 
         Returns:
-            Dict with url, sections (name -> raw text), and optional references.
-            The LLM should parse the raw text to extract individual posts.
+            When output="inline":
+                Dict with url, sections (name -> raw text), and optional
+                references.  The LLM should parse the raw text to extract
+                individual posts.
+            When output="file":
+                Dict with output="file", file (absolute path), preview (first
+                ~200 chars of the posts text), url, and post_urns.  The full
+                result is in the JSON file at the given path.
         """
         try:
             logger.info("Scraping company posts: %s (detail=%s)", company_name, detail)
@@ -150,7 +193,9 @@ def register_company_tools(mcp: FastMCP) -> None:
             if section_errors:
                 result["section_errors"] = section_errors
 
-            return apply_detail_filter(result, detail)
+            return format_tool_output(
+                apply_detail_filter(result, detail), "get_company_posts", output
+            )
 
         except Exception as e:
             raise_tool_error(e, "get_company_posts")  # NoReturn

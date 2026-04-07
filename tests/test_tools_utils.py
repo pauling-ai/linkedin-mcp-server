@@ -1,8 +1,16 @@
 """Unit tests for linkedin_mcp_server/tools/utils.py."""
 
+import json
+
 import pytest
 
-from linkedin_mcp_server.tools.utils import BASIC_SECTION_MAX_CHARS, apply_detail_filter
+from linkedin_mcp_server.tools.utils import (
+    BASIC_SECTION_MAX_CHARS,
+    PREVIEW_MAX_CHARS,
+    apply_detail_filter,
+    format_tool_output,
+    _generate_preview,
+)
 
 
 class TestApplyDetailFilter:
@@ -106,3 +114,93 @@ class TestApplyDetailFilter:
         }
         out = apply_detail_filter(result, "verbose")
         assert out is result
+
+
+class TestGeneratePreview:
+    def test_sections_result(self):
+        result = {"sections": {"main_profile": "Alice Smith\nSoftware Engineer at Acme"}}
+        assert _generate_preview(result) == "Alice Smith\nSoftware Engineer at Acme"
+
+    def test_sections_truncated(self):
+        result = {"sections": {"main_profile": "x" * 500}}
+        assert len(_generate_preview(result)) == PREVIEW_MAX_CHARS
+
+    def test_sections_skips_empty(self):
+        result = {"sections": {"main_profile": "", "experience": "Has experience"}}
+        assert _generate_preview(result) == "Has experience"
+
+    def test_post_result(self):
+        result = {"post": {"text": "Excited to share my new role!", "posted_at": "2d"}}
+        assert _generate_preview(result) == "Excited to share my new role!"
+
+    def test_likers_result(self):
+        result = {
+            "likers": [{"name": "Alice"}, {"name": "Bob"}],
+            "count": 2,
+        }
+        assert _generate_preview(result) == "2 reactions: Alice, Bob"
+
+    def test_likers_with_overflow(self):
+        likers = [{"name": f"Person{i}"} for i in range(8)]
+        result = {"likers": likers, "count": 8}
+        preview = _generate_preview(result)
+        assert "and 3 more" in preview
+
+    def test_conversations_result(self):
+        result = {"conversations": [{"name": "Alice"}, {"name": "Bob"}]}
+        assert _generate_preview(result) == "2 conversations: Alice, Bob"
+
+    def test_messages_result(self):
+        result = {
+            "messages": [
+                {"sender": "Alice", "text": "Hey!"},
+                {"sender": "me", "text": "Hi there"},
+            ]
+        }
+        preview = _generate_preview(result)
+        assert "2 messages" in preview
+        assert "me" in preview
+
+    def test_messages_raw_fallback(self):
+        result = {"messages_raw": "Some raw text from the thread"}
+        assert _generate_preview(result) == "Some raw text from the thread"
+
+    def test_empty_result(self):
+        assert _generate_preview({}) == ""
+
+
+class TestFormatToolOutput:
+    def test_inline_returns_unchanged(self):
+        result = {"url": "https://example.com", "sections": {"main": "text"}}
+        out = format_tool_output(result, "test_tool", "inline")
+        assert out is result
+
+    def test_file_writes_json(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = {
+            "url": "https://www.linkedin.com/in/foo/",
+            "sections": {"main_profile": "Alice Smith\nEngineer"},
+        }
+        out = format_tool_output(result, "test_tool", "file")
+
+        assert out["output"] == "file"
+        assert out["url"] == "https://www.linkedin.com/in/foo/"
+        assert "Alice" in out["preview"]
+
+        written = json.loads(open(out["file"]).read())
+        assert written == result
+
+    def test_file_carries_metadata_keys(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = {
+            "url": "https://www.linkedin.com/jobs/search/",
+            "sections": {"search_results": "jobs here"},
+            "job_ids": ["123", "456"],
+            "post_urns": ["urn:li:activity:111"],
+        }
+        out = format_tool_output(result, "search_jobs", "file")
+
+        assert out["job_ids"] == ["123", "456"]
+        assert out["post_urns"] == ["urn:li:activity:111"]
+        # Full sections should NOT be in the summary
+        assert "sections" not in out
