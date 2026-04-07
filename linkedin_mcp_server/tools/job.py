@@ -49,6 +49,7 @@ def register_job_tools(mcp: FastMCP) -> None:
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
             output: Controls how the scraped data is delivered back to the caller.
+                **CRITICAL TOKEN EFFICIENCY:** Use output="file" whenever possible to save the full result to a local JSON file and return a lightweight summary. This significantly reduces token consumption and prevents context window limits. Only use "inline" when the LLM must perform immediate, small-scale analysis on the exact text.
                 "inline" (default): the full result dict is returned directly in
                     the MCP response.
                 "file": the full result is saved as a JSON file in the current
@@ -133,6 +134,7 @@ def register_job_tools(mcp: FastMCP) -> None:
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
             output: Controls how the scraped data is delivered back to the caller.
+                **CRITICAL TOKEN EFFICIENCY:** Use output="file" whenever possible to save the full result to a local JSON file and return a lightweight summary. This significantly reduces token consumption and prevents context window limits. Only use "inline" when the LLM must perform immediate, small-scale analysis on the exact text.
                 "inline" (default): the full result dict is returned directly in
                     the MCP response.
                 "file": the full result is saved as a JSON file in the current

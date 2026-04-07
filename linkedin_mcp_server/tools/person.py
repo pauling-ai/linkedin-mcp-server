@@ -57,6 +57,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
             output: Controls how the scraped data is delivered back to the caller.
+                **CRITICAL TOKEN EFFICIENCY:** Use output="file" whenever possible to save the full result to a local JSON file and return a lightweight summary. This significantly reduces token consumption and prevents context window limits. Only use "inline" when the LLM must perform immediate, small-scale analysis on the exact text.
                 "inline" (default): the full result dict is returned directly in
                     the MCP response.  The calling LLM receives and processes the
                     entire payload, which can be thousands of tokens.
@@ -137,6 +138,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             linkedin_username: LinkedIn username (e.g., "stickerdaniel", "williamhgates")
             ctx: FastMCP context for progress reporting
             output: Controls how the scraped data is delivered back to the caller.
+                **CRITICAL TOKEN EFFICIENCY:** Use output="file" whenever possible to save the full result to a local JSON file and return a lightweight summary. This significantly reduces token consumption and prevents context window limits. Only use "inline" when the LLM must perform immediate, small-scale analysis on the exact text.
                 "inline" (default): the full result dict is returned directly in
                     the MCP response.
                 "file": the full result is saved as a JSON file in the current
@@ -207,6 +209,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
             output: Controls how the scraped data is delivered back to the caller.
+                **CRITICAL TOKEN EFFICIENCY:** Use output="file" whenever possible to save the full result to a local JSON file and return a lightweight summary. This significantly reduces token consumption and prevents context window limits. Only use "inline" when the LLM must perform immediate, small-scale analysis on the exact text.
                 "inline" (default): the full result dict is returned directly in
                     the MCP response.
                 "file": the full result is saved as a JSON file in the current
