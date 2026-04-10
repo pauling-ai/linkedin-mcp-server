@@ -2,10 +2,28 @@
 
 import asyncio
 import logging
+import random
 
 from patchright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
+from linkedin_mcp_server.config import get_config
+
 logger = logging.getLogger(__name__)
+
+
+def get_human_delay_seconds() -> float:
+    """Return a randomized human-like delay based on browser config."""
+    browser = get_config().browser
+    minimum = browser.human_delay_min_ms / 1000
+    maximum = browser.human_delay_max_ms / 1000
+    return random.uniform(minimum, maximum)
+
+
+async def sleep_human_delay() -> float:
+    """Sleep for a randomized human-like delay and return the chosen duration."""
+    delay = get_human_delay_seconds()
+    await asyncio.sleep(delay)
+    return delay
 
 
 async def scroll_to_bottom(

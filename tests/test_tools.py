@@ -378,7 +378,7 @@ class TestFollowCompany:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.company.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
 
@@ -404,7 +404,7 @@ class TestFollowCompany:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.company.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
 
@@ -494,7 +494,7 @@ class TestSendConnectionRequest:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -522,7 +522,7 @@ class TestSendConnectionRequest:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn(
                 "testuser", mock_context, message="Hi, let's connect!", extractor=mock_extractor
@@ -553,7 +553,7 @@ class TestSendConnectionRequest:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -582,7 +582,7 @@ class TestSendConnectionRequest:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -659,7 +659,7 @@ class TestFollowPerson:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -690,7 +690,7 @@ class TestFollowPerson:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -718,7 +718,7 @@ class TestFollowPerson:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -743,7 +743,7 @@ class TestFollowPerson:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -841,7 +841,7 @@ class TestGetInbox:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.messaging.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn(mock_context, extractor=mock_extractor)
 
@@ -868,7 +868,7 @@ class TestGetInbox:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.messaging.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn(mock_context, unread_only=True, extractor=mock_extractor)
 
@@ -919,7 +919,7 @@ class TestGetConversation:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.messaging.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
 
@@ -945,7 +945,7 @@ class TestGetConversation:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.messaging.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
 
@@ -973,7 +973,7 @@ class TestGetConversation:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.messaging.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.messaging.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("janesmith", mock_context, extractor=mock_extractor)
 
@@ -1057,7 +1057,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1082,7 +1082,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1108,7 +1108,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1136,7 +1136,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1183,7 +1183,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1228,7 +1228,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1252,7 +1252,7 @@ class TestCheckFollow:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1334,7 +1334,7 @@ class TestCheckConnection:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1360,7 +1360,7 @@ class TestCheckConnection:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1385,7 +1385,7 @@ class TestCheckConnection:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1412,7 +1412,7 @@ class TestCheckConnection:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1439,7 +1439,7 @@ class TestCheckConnection:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.person.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.person.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("testuser", mock_context, extractor=mock_extractor)
 
@@ -1494,7 +1494,7 @@ class TestCheckFollowCompany:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.company.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
 
@@ -1519,7 +1519,7 @@ class TestCheckFollowCompany:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.company.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
 
@@ -1543,7 +1543,7 @@ class TestCheckFollowCompany:
                 new_callable=AsyncMock,
                 return_value=mock_browser,
             ),
-            patch("linkedin_mcp_server.tools.company.asyncio.sleep", new_callable=AsyncMock),
+            patch("linkedin_mcp_server.tools.company.sleep_human_delay", new_callable=AsyncMock),
         ):
             result = await tool_fn("anthropic", mock_context, extractor=mock_extractor)
 

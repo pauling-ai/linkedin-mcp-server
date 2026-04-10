@@ -5,7 +5,6 @@ Uses innerText extraction for resilient company data capture
 with configurable section selection.
 """
 
-import asyncio
 import logging
 from typing import Any, Literal
 
@@ -16,6 +15,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_company_sections
+from linkedin_mcp_server.core.utils import sleep_human_delay
 from linkedin_mcp_server.scraping.link_metadata import Reference
 from linkedin_mcp_server.tools.utils import apply_detail_filter, format_tool_output
 
@@ -231,7 +231,7 @@ def register_company_tools(mcp: FastMCP) -> None:
 
             company_url = f"https://www.linkedin.com/company/{company_name}/"
             await page.goto(company_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.0)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=50, total=100, message="Looking for Follow button")
             follow_btn = page.locator("button").filter(has_text="Follow").first
@@ -244,7 +244,7 @@ def register_company_tools(mcp: FastMCP) -> None:
                 }
 
             await follow_btn.click()
-            await asyncio.sleep(1.0)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
             return {
@@ -284,7 +284,7 @@ def register_company_tools(mcp: FastMCP) -> None:
 
             company_url = f"https://www.linkedin.com/company/{company_name}/"
             await page.goto(company_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.0)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=60, total=100, message="Checking follow status")
 

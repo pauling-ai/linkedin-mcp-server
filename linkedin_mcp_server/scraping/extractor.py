@@ -1,6 +1,5 @@
 """Core extraction engine using innerText instead of DOM selectors."""
 
-import asyncio
 from dataclasses import dataclass
 import logging
 import re
@@ -23,6 +22,7 @@ from linkedin_mcp_server.debug_utils import stabilize_navigation
 from linkedin_mcp_server.error_diagnostics import build_issue_diagnostics
 from linkedin_mcp_server.core.utils import (
     handle_modal_close,
+    sleep_human_delay,
     scroll_job_sidebar,
     scroll_to_bottom,
 )
@@ -37,9 +37,6 @@ from .fields import COMPANY_SECTIONS, PERSON_SECTIONS
 logger = logging.getLogger(__name__)
 
 WaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
-
-# Delay between page navigations
-_NAV_DELAY = 2.0
 
 # LinkedIn shows 25 results per page
 _PAGE_SIZE = 25
@@ -524,7 +521,7 @@ class LinkedInExtractor:
                 continue
 
             if not first:
-                await asyncio.sleep(_NAV_DELAY)
+                await sleep_human_delay()
             first = False
 
             url = base_url + suffix
@@ -583,7 +580,7 @@ class LinkedInExtractor:
                 continue
 
             if not first:
-                await asyncio.sleep(_NAV_DELAY)
+                await sleep_human_delay()
             first = False
 
             url = base_url + suffix
@@ -1047,7 +1044,7 @@ class LinkedInExtractor:
                 break
 
             if page_num > 0:
-                await asyncio.sleep(_NAV_DELAY)
+                await sleep_human_delay()
 
             url = (
                 base_url
@@ -1296,7 +1293,7 @@ class LinkedInExtractor:
         # Visit the profile first for natural navigation flow.
         profile_url = f"https://www.linkedin.com/in/{username}/"
         await self._goto_with_auth_checks(profile_url)
-        await asyncio.sleep(_NAV_DELAY)
+        await sleep_human_delay()
 
         # Use /recent-activity/all/ — the /posts/ tab is a client-side filter
         # and doesn't render reliably as a direct navigation target.

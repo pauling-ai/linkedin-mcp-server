@@ -125,7 +125,7 @@ After installing (either in a project venv or globally), add to your `.mcp.json`
   "mcpServers": {
     "linkedin": {
       "command": "/path/to/venv/bin/linkedin-scraper-mcp",
-      "args": ["--slow-mo", "500"],
+      "args": ["--human-delay-min-ms", "500", "--human-delay-max-ms", "2000"],
       "env": {
         "LOG_LEVEL": "INFO"
       }
@@ -141,7 +141,7 @@ Or run directly from the repo with `uv` (no install needed):
   "mcpServers": {
     "linkedin": {
       "command": "uv",
-      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server", "--slow-mo", "500"],
+      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server", "--human-delay-min-ms", "500", "--human-delay-max-ms", "2000"],
       "env": {
         "LOG_LEVEL": "INFO"
       }
@@ -152,13 +152,17 @@ Or run directly from the repo with `uv` (no install needed):
 
 The `uv` approach is the simplest — just update the `--directory` path and you're done.
 
+Use `--slow-mo` only when debugging or when you want to watch browser actions happen more slowly. For LinkedIn-facing pacing, prefer `--human-delay-min-ms` / `--human-delay-max-ms`, which add randomized waits around the request-driving actions instead of slowing every browser operation uniformly.
+
 ## CLI Options
 
 - `--login` - Open browser to log in and save persistent profile
 - `--logout` - Clear stored LinkedIn browser profile
 - `--status` - Check if current session is valid and exit
 - `--no-headless` - Show browser window (useful for debugging)
-- `--slow-mo MS` - Delay between browser actions in ms (default: 0)
+- `--slow-mo MS` - Debugging aid: slows all browser actions uniformly in ms (default: 0)
+- `--human-delay-min-ms MS` - Minimum randomized delay between LinkedIn actions (default: 500)
+- `--human-delay-max-ms MS` - Maximum randomized delay between LinkedIn actions (default: 2000)
 - `--log-level {DEBUG,INFO,WARNING,ERROR}` - Logging level (default: WARNING)
 - `--timeout MS` - Browser timeout for page operations in ms (default: 5000)
 - `--transport {stdio,streamable-http}` - Transport mode (default: stdio)
@@ -172,6 +176,10 @@ The `uv` approach is the simplest — just update the `--directory` path and you
 **Scraping issues:** Use `--no-headless` to watch the browser and `--log-level DEBUG` for detailed logs.
 
 **Timeout issues:** Increase with `--timeout 10000` or env var `TIMEOUT=10000`.
+
+**Human-like pacing:** Tune with `--human-delay-min-ms` / `--human-delay-max-ms` or env vars `HUMAN_DELAY_MIN_MS` / `HUMAN_DELAY_MAX_MS`. These affect the effective LinkedIn request cadence.
+
+**`slow_mo` vs human delay:** `--slow-mo` / `SLOW_MO` is mainly for debugging because it slows nearly every browser action. The human-delay settings are the better choice for production pacing. In most cases you should use one or the other, not both.
 
 **`send_message` / `get_conversation` not finding the Message button:** The target user must be a 1st-degree connection. The tool returns an error with diagnostic info if the button isn't found.
 

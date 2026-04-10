@@ -4,7 +4,6 @@ LinkedIn messaging tools.
 Read inbox conversations and individual message threads.
 """
 
-import asyncio
 import logging
 from typing import Any, Literal
 
@@ -15,6 +14,7 @@ from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor
+from linkedin_mcp_server.core.utils import sleep_human_delay
 from linkedin_mcp_server.tools.utils import format_tool_output
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def register_messaging_tools(mcp: FastMCP) -> None:
                 "https://www.linkedin.com/messaging/",
                 wait_until="domcontentloaded",
             )
-            await asyncio.sleep(3.0)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=50, total=100, message="Extracting conversations")
 
@@ -213,7 +213,7 @@ def register_messaging_tools(mcp: FastMCP) -> None:
 
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=30, total=100, message="Opening message thread")
 
@@ -231,7 +231,7 @@ def register_messaging_tools(mcp: FastMCP) -> None:
                 }
 
             await message_btn.click()
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=60, total=100, message="Reading messages")
 

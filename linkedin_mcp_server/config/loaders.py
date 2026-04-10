@@ -44,6 +44,8 @@ class EnvironmentKeys:
     PORT = "PORT"
     HTTP_PATH = "HTTP_PATH"
     SLOW_MO = "SLOW_MO"
+    HUMAN_DELAY_MIN_MS = "HUMAN_DELAY_MIN_MS"
+    HUMAN_DELAY_MAX_MS = "HUMAN_DELAY_MAX_MS"
     VIEWPORT = "VIEWPORT"
     CHROME_PATH = "CHROME_PATH"
     USER_DATA_DIR = "USER_DATA_DIR"
@@ -132,6 +134,22 @@ def load_from_env(config: AppConfig) -> AppConfig:
                 f"Invalid SLOW_MO: '{slow_mo_env}'. Must be an integer."
             )
 
+    if human_delay_min_env := os.environ.get(EnvironmentKeys.HUMAN_DELAY_MIN_MS):
+        try:
+            config.browser.human_delay_min_ms = int(human_delay_min_env)
+        except ValueError:
+            raise ConfigurationError(
+                f"Invalid HUMAN_DELAY_MIN_MS: '{human_delay_min_env}'. Must be an integer."
+            )
+
+    if human_delay_max_env := os.environ.get(EnvironmentKeys.HUMAN_DELAY_MAX_MS):
+        try:
+            config.browser.human_delay_max_ms = int(human_delay_max_env)
+        except ValueError:
+            raise ConfigurationError(
+                f"Invalid HUMAN_DELAY_MAX_MS: '{human_delay_max_env}'. Must be an integer."
+            )
+
     # Browser viewport (validated in BrowserConfig.validate())
     if viewport_env := os.environ.get(EnvironmentKeys.VIEWPORT):
         try:
@@ -203,6 +221,22 @@ def load_from_args(config: AppConfig) -> AppConfig:
         default=0,
         metavar="MS",
         help="Slow down browser actions by N milliseconds (debugging)",
+    )
+
+    parser.add_argument(
+        "--human-delay-min-ms",
+        type=int,
+        default=None,
+        metavar="MS",
+        help="Minimum randomized delay between LinkedIn actions in milliseconds (default: 500)",
+    )
+
+    parser.add_argument(
+        "--human-delay-max-ms",
+        type=int,
+        default=None,
+        metavar="MS",
+        help="Maximum randomized delay between LinkedIn actions in milliseconds (default: 2000)",
     )
 
     parser.add_argument(
@@ -288,6 +322,12 @@ def load_from_args(config: AppConfig) -> AppConfig:
     # Browser configuration
     if args.slow_mo:
         config.browser.slow_mo = args.slow_mo
+
+    if args.human_delay_min_ms is not None:
+        config.browser.human_delay_min_ms = args.human_delay_min_ms
+
+    if args.human_delay_max_ms is not None:
+        config.browser.human_delay_max_ms = args.human_delay_max_ms
 
     if args.user_agent:
         config.browser.user_agent = args.user_agent

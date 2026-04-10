@@ -13,6 +13,8 @@ class TestBrowserConfig:
         config = BrowserConfig()
         assert config.headless is True
         assert config.default_timeout == 5000
+        assert config.human_delay_min_ms == 500
+        assert config.human_delay_max_ms == 2000
         assert config.user_data_dir == "~/.linkedin-mcp/profile"
 
     def test_validate_passes(self):
@@ -25,6 +27,14 @@ class TestBrowserConfig:
     def test_validate_negative_slow_mo(self):
         with pytest.raises(ConfigurationError):
             BrowserConfig(slow_mo=-1).validate()
+
+    def test_validate_negative_human_delay_min(self):
+        with pytest.raises(ConfigurationError):
+            BrowserConfig(human_delay_min_ms=-1).validate()
+
+    def test_validate_human_delay_max_below_min(self):
+        with pytest.raises(ConfigurationError):
+            BrowserConfig(human_delay_min_ms=1000, human_delay_max_ms=500).validate()
 
 
 class TestServerConfig:
@@ -134,6 +144,34 @@ class TestLoaders:
 
         config = load_from_env(AppConfig())
         assert config.browser.slow_mo == 100
+
+    def test_load_from_env_human_delay_min_ms(self, monkeypatch):
+        monkeypatch.setenv("HUMAN_DELAY_MIN_MS", "750")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.human_delay_min_ms == 750
+
+    def test_load_from_env_human_delay_max_ms(self, monkeypatch):
+        monkeypatch.setenv("HUMAN_DELAY_MAX_MS", "2500")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.human_delay_max_ms == 2500
+
+    def test_load_from_env_invalid_human_delay_min_ms(self, monkeypatch):
+        monkeypatch.setenv("HUMAN_DELAY_MIN_MS", "invalid")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        with pytest.raises(ConfigurationError, match="Invalid HUMAN_DELAY_MIN_MS"):
+            load_from_env(AppConfig())
+
+    def test_load_from_env_invalid_human_delay_max_ms(self, monkeypatch):
+        monkeypatch.setenv("HUMAN_DELAY_MAX_MS", "invalid")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        with pytest.raises(ConfigurationError, match="Invalid HUMAN_DELAY_MAX_MS"):
+            load_from_env(AppConfig())
 
     def test_load_from_env_viewport(self, monkeypatch):
         monkeypatch.setenv("VIEWPORT", "1920x1080")

@@ -13,6 +13,7 @@ from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
 
 from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
+from linkedin_mcp_server.core.utils import sleep_human_delay
 from linkedin_mcp_server.dependencies import get_extractor
 from linkedin_mcp_server.error_handler import raise_tool_error
 from linkedin_mcp_server.scraping import LinkedInExtractor, parse_person_sections
@@ -291,7 +292,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             logger.info("send_message: navigating to %s", profile_url)
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
             logger.info("send_message: landed on %s, title=%r", page.url, await page.title())
 
             await ctx.report_progress(progress=40, total=100, message="Looking for Message button")
@@ -319,7 +320,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await message_btn.click()
             logger.info("send_message: clicked Message button")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
             logger.info("send_message: after click, url=%s", page.url)
 
             await ctx.report_progress(progress=60, total=100, message="Typing message")
@@ -361,7 +362,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 logger.info("send_message: 'Send' role button count=%d", send_btn_count)
             await send_btn.click()
             logger.info("send_message: send button clicked")
-            await asyncio.sleep(1.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
             logger.info("send_message: success, message sent to %s", linkedin_username)
@@ -409,7 +410,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             logger.info("send_connection_request: navigating to %s", profile_url)
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=30, total=100, message="Looking for Connect button")
 
@@ -424,7 +425,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 )
                 if await more_btn.count():
                     await more_btn.click()
-                    await asyncio.sleep(1.0)
+                    await sleep_human_delay()
                     connect_btn = page.get_by_role("menuitem", name="Connect", exact=True).first
                     btn_count = await connect_btn.count()
 
@@ -443,7 +444,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await connect_btn.click()
             logger.info("send_connection_request: clicked Connect button")
-            await asyncio.sleep(1.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=60, total=100, message="Handling connection modal")
 
@@ -452,7 +453,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 add_note_btn = page.get_by_role("button", name="Add a note", exact=True).first
                 if await add_note_btn.count():
                     await add_note_btn.click()
-                    await asyncio.sleep(1.0)
+                    await sleep_human_delay()
 
                     note_box = page.locator("textarea[name='message']").first
                     await note_box.wait_for(state="visible", timeout=5000)
@@ -472,7 +473,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                     send_btn = page.get_by_role("button", name="Send", exact=True).first
 
             await send_btn.click()
-            await asyncio.sleep(1.5)
+            await sleep_human_delay()
             logger.info("send_connection_request: sent to %s", linkedin_username)
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
@@ -519,7 +520,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             logger.info("follow_person: navigating to %s", profile_url)
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=40, total=100, message="Looking for Follow button")
 
@@ -541,7 +542,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                 more_btn = page.locator("button").filter(has_text="More").nth(1)
                 if await more_btn.count():
                     await more_btn.click()
-                    await asyncio.sleep(1.0)
+                    await sleep_human_delay()
                     follow_btn = page.get_by_role("menuitem", name="Follow", exact=True).first
                     btn_count = await follow_btn.count()
 
@@ -560,7 +561,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             await follow_btn.click()
             logger.info("follow_person: clicked Follow button for %s", linkedin_username)
-            await asyncio.sleep(1.0)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=100, total=100, message="Complete")
             return {
@@ -602,7 +603,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=60, total=100, message="Checking follow status")
 
@@ -637,7 +638,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             more_btn = page.locator("button").filter(has_text="More").nth(1)
             if await more_btn.count():
                 await more_btn.click()
-                await asyncio.sleep(1.0)
+                await sleep_human_delay()
                 unfollow_item = page.get_by_role("menuitem", name="Unfollow", exact=True).first
                 if await unfollow_item.count():
                     # Close the dropdown before returning
@@ -688,7 +689,7 @@ def register_person_tools(mcp: FastMCP) -> None:
 
             profile_url = f"https://www.linkedin.com/in/{linkedin_username}/"
             await page.goto(profile_url, wait_until="domcontentloaded")
-            await asyncio.sleep(2.5)
+            await sleep_human_delay()
 
             await ctx.report_progress(progress=60, total=100, message="Checking connection status")
 
@@ -713,7 +714,7 @@ def register_person_tools(mcp: FastMCP) -> None:
             more_btn = page.locator("button").filter(has_text="More").nth(1)
             if await more_btn.count():
                 await more_btn.click()
-                await asyncio.sleep(1.0)
+                await sleep_human_delay()
                 connect_item = page.get_by_role("menuitem", name="Connect", exact=True).first
                 if await connect_item.count():
                     await page.keyboard.press("Escape")
