@@ -131,7 +131,7 @@ def register_company_tools(mcp: FastMCP) -> None:
             ctx: FastMCP context for progress reporting
             detail: Controls how much text is returned.
                 "basic" (default): truncates section text to BASIC_SECTION_MAX_CHARS.
-                    post_urns and references are always kept.
+                    post_urns, posts, and references are always kept.
                 "full": returns the complete raw page text.
                 If basic mode doesn't contain the information you need, call this
                 tool again with detail="full" to get the complete page text.
@@ -146,6 +146,7 @@ def register_company_tools(mcp: FastMCP) -> None:
                     - preview: first ~200 characters of the posts section text
                     - url: the LinkedIn company posts URL
                     - post_urns: list of post URNs (always included if present)
+                    - posts: structured post metadata with urn and posted_at
 
                     Use "file" when collecting company posts to save or when
                     processing many companies in sequence.  The caller can read
@@ -153,9 +154,8 @@ def register_company_tools(mcp: FastMCP) -> None:
 
         Returns:
             When output="inline":
-                Dict with url, sections (name -> raw text), and optional
-                references.  The LLM should parse the raw text to extract
-                individual posts.
+                Dict with url, sections (name -> raw text), optional posts
+                metadata, and optional references.
             When output="file":
                 Dict with output="file", file (absolute path), preview (first
                 ~200 chars of the posts text), url, and post_urns.  The full
@@ -171,6 +171,7 @@ def register_company_tools(mcp: FastMCP) -> None:
             url = f"https://www.linkedin.com/company/{company_name}/posts/"
             extracted = await extractor.extract_page(url, section_name="posts")
             post_urns = await extractor.extract_post_urns()
+            posts = await extractor.extract_posts_metadata()
 
             sections: dict[str, str] = {}
             references: dict[str, list[Reference]] = {}
@@ -188,6 +189,8 @@ def register_company_tools(mcp: FastMCP) -> None:
                 "url": url,
                 "sections": sections,
             }
+            if posts:
+                result["posts"] = posts
             if post_urns:
                 result["post_urns"] = post_urns
             if references:

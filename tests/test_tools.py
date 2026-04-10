@@ -245,6 +245,7 @@ class TestCompanyTools:
             return_value=ExtractedSection(text="Post 1\nPost 2", references=[])
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -269,6 +270,7 @@ class TestCompanyTools:
                 "urn:li:activity:1111111111111111111",
             ]
         )
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -282,12 +284,44 @@ class TestCompanyTools:
             "urn:li:activity:1111111111111111111",
         ]
 
+    async def test_get_company_posts_returns_post_dates(self, mock_context):
+        mock_extractor = MagicMock()
+        mock_extractor.extract_page = AsyncMock(
+            return_value=ExtractedSection(text="Post 1\nPost 2", references=[])
+        )
+        mock_extractor.extract_post_urns = AsyncMock(
+            return_value=["urn:li:activity:7439961861053157377"]
+        )
+        mock_extractor.extract_posts_metadata = AsyncMock(
+            return_value=[
+                {
+                    "urn": "urn:li:activity:7439961861053157377",
+                    "posted_at": "10 hours ago",
+                }
+            ]
+        )
+
+        from linkedin_mcp_server.tools.company import register_company_tools
+
+        mcp = FastMCP("test")
+        register_company_tools(mcp)
+
+        tool_fn = await get_tool_fn(mcp, "get_company_posts")
+        result = await tool_fn("testcorp", mock_context, extractor=mock_extractor)
+        assert result["posts"] == [
+            {
+                "urn": "urn:li:activity:7439961861053157377",
+                "posted_at": "10 hours ago",
+            }
+        ]
+
     async def test_get_company_posts_omits_empty_text(self, mock_context):
         mock_extractor = MagicMock()
         mock_extractor.extract_page = AsyncMock(
             return_value=ExtractedSection(text="", references=[])
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -308,6 +342,7 @@ class TestCompanyTools:
             )
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -336,6 +371,7 @@ class TestCompanyTools:
             )
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         from linkedin_mcp_server.tools.company import register_company_tools
 
@@ -1788,6 +1824,7 @@ class TestDetailMode:
             return_value=ExtractedSection(text="p" * 5000, references=[])
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         mcp = FastMCP("test")
         register_company_tools(mcp)
@@ -1804,6 +1841,7 @@ class TestDetailMode:
             return_value=ExtractedSection(text="p" * 5000, references=[])
         )
         mock_extractor.extract_post_urns = AsyncMock(return_value=[])
+        mock_extractor.extract_posts_metadata = AsyncMock(return_value=[])
 
         mcp = FastMCP("test")
         register_company_tools(mcp)
@@ -1822,6 +1860,12 @@ class TestDetailMode:
         mock_extractor.extract_post_urns = AsyncMock(
             return_value=["urn:li:activity:111", "urn:li:activity:222"]
         )
+        mock_extractor.extract_posts_metadata = AsyncMock(
+            return_value=[
+                {"urn": "urn:li:activity:111", "posted_at": "10h"},
+                {"urn": "urn:li:activity:222", "posted_at": "1d"},
+            ]
+        )
 
         mcp = FastMCP("test")
         register_company_tools(mcp)
@@ -1829,6 +1873,10 @@ class TestDetailMode:
 
         result = await tool_fn("acme", mock_context, detail="basic", extractor=mock_extractor)
         assert result["post_urns"] == ["urn:li:activity:111", "urn:li:activity:222"]
+        assert result["posts"] == [
+            {"urn": "urn:li:activity:111", "posted_at": "10h"},
+            {"urn": "urn:li:activity:222", "posted_at": "1d"},
+        ]
 
     # ── get_job_details ─────────────────────────────────────────────────────
 

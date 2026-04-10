@@ -47,7 +47,7 @@ BASIC_SECTION_MAX_CHARS = 2000
 | Tool | Description |
 |------|-------------|
 | `get_company_profile` | Get company info with optional sections: `posts`, `jobs`. Supports `detail` param. |
-| `get_company_posts` | Get recent posts from a company's feed; returns post URNs for further use. Supports `detail` param. |
+| `get_company_posts` | Get recent posts from a company's feed; returns post URNs plus lightweight `posts[]` metadata including `posted_at`. Supports `detail` param. |
 | `follow_company` | Follow a company page |
 | `check_follow_company` | Check whether you are following a company |
 

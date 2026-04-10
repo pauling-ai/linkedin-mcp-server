@@ -1430,3 +1430,44 @@ class LinkedInExtractor:
                 return [...urns];
             }"""
         )
+
+    async def extract_posts_metadata(self) -> list[dict[str, str | None]]:
+        """Extract lightweight metadata for visible organic feed posts.
+
+        Returns one item per top-level activity post currently rendered on the
+        page. Each item currently contains:
+        - urn: LinkedIn activity URN
+        - posted_at: timestamp text from the post's <time> element
+        """
+        return await self._page.evaluate(
+            """() => {
+                const seen = new Set();
+                const posts = [];
+                const containers = Array.from(
+                    document.querySelectorAll('[data-urn*="urn:li:activity:"]')
+                );
+
+                for (const container of containers) {
+                    // Skip nested original posts inside repost/share containers.
+                    if (container.querySelector('[data-urn*="urn:li:activity:"]')) {
+                        continue;
+                    }
+
+                    const urn = container.getAttribute('data-urn') || null;
+                    if (!urn || seen.has(urn)) continue;
+                    seen.add(urn);
+
+                    const timeEl = container.querySelector('time');
+                    const postedAt = timeEl
+                        ? (timeEl.getAttribute('datetime') || timeEl.innerText?.trim() || null)
+                        : null;
+
+                    posts.push({
+                        urn,
+                        posted_at: postedAt,
+                    });
+                }
+
+                return posts;
+            }"""
+        )
