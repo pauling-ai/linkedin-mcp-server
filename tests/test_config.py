@@ -194,3 +194,32 @@ class TestLoaders:
 
         config = load_from_env(AppConfig())
         assert config.browser.user_data_dir == "/custom/profile"
+
+    def test_load_from_env_project_auth(self, monkeypatch):
+        monkeypatch.delenv("USER_DATA_DIR", raising=False)
+        monkeypatch.setenv("PROJECT_AUTH", "true")
+        from linkedin_mcp_server.config.loaders import (
+            PROJECT_AUTH_USER_DATA_DIR,
+            load_from_env,
+        )
+
+        config = load_from_env(AppConfig())
+        assert config.browser.user_data_dir == PROJECT_AUTH_USER_DATA_DIR
+
+    def test_load_from_env_user_data_dir_wins_over_project_auth(self, monkeypatch):
+        monkeypatch.setenv("USER_DATA_DIR", "/custom/profile")
+        monkeypatch.setenv("PROJECT_AUTH", "true")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.user_data_dir == "/custom/profile"
+
+    def test_load_from_args_project_auth(self, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["linkedin-mcp-server", "--project-auth"])
+        from linkedin_mcp_server.config.loaders import (
+            PROJECT_AUTH_USER_DATA_DIR,
+            load_from_args,
+        )
+
+        config = load_from_args(AppConfig())
+        assert config.browser.user_data_dir == PROJECT_AUTH_USER_DATA_DIR

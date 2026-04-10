@@ -19,6 +19,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+PROJECT_AUTH_USER_DATA_DIR = ".linkedin-mcp-server/profile"
+
 # Boolean value mappings for environment variable parsing
 TRUTHY_VALUES = ("1", "true", "True", "yes", "Yes")
 FALSY_VALUES = ("0", "false", "False", "no", "No")
@@ -46,6 +48,7 @@ class EnvironmentKeys:
     SLOW_MO = "SLOW_MO"
     HUMAN_DELAY_MIN_MS = "HUMAN_DELAY_MIN_MS"
     HUMAN_DELAY_MAX_MS = "HUMAN_DELAY_MAX_MS"
+    PROJECT_AUTH = "PROJECT_AUTH"
     VIEWPORT = "VIEWPORT"
     CHROME_PATH = "CHROME_PATH"
     USER_DATA_DIR = "USER_DATA_DIR"
@@ -96,6 +99,8 @@ def load_from_env(config: AppConfig) -> AppConfig:
     # Persistent browser profile directory
     if user_data_dir := os.environ.get(EnvironmentKeys.USER_DATA_DIR):
         config.browser.user_data_dir = user_data_dir
+    elif os.environ.get(EnvironmentKeys.PROJECT_AUTH) in TRUTHY_VALUES:
+        config.browser.user_data_dir = PROJECT_AUTH_USER_DATA_DIR
 
     # Timeout for page operations (validated in BrowserConfig.validate())
     if timeout_env := os.environ.get(EnvironmentKeys.TIMEOUT):
@@ -224,6 +229,12 @@ def load_from_args(config: AppConfig) -> AppConfig:
     )
 
     parser.add_argument(
+        "--project-auth",
+        action="store_true",
+        help="Store LinkedIn auth under the current project at .linkedin-mcp-server/",
+    )
+
+    parser.add_argument(
         "--human-delay-min-ms",
         type=int,
         default=None,
@@ -322,6 +333,9 @@ def load_from_args(config: AppConfig) -> AppConfig:
     # Browser configuration
     if args.slow_mo:
         config.browser.slow_mo = args.slow_mo
+
+    if args.project_auth:
+        config.browser.user_data_dir = PROJECT_AUTH_USER_DATA_DIR
 
     if args.human_delay_min_ms is not None:
         config.browser.human_delay_min_ms = args.human_delay_min_ms
