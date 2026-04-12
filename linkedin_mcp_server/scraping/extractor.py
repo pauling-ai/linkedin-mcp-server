@@ -720,46 +720,111 @@ class LinkedInExtractor:
                 "error": "Reactions modal did not open",
             }
 
-        # Scroll any plausible modal container to load all likers.
+        # Expand and scroll the reactions modal until no new liker entries load.
         await self._page.evaluate(
-            """async ({modalSelector, scrollTargetSelector, pauseMs, maxScrolls}) => {
+            """async ({
+                modalSelector,
+                scrollTargetSelector,
+                linkSelector,
+                pauseMs,
+                maxRounds,
+                stagnantRounds,
+            }) => {
                 const modalRoot = document.querySelector(modalSelector);
                 if (!modalRoot) return;
 
-                const targetCandidates = [
-                    modalRoot,
-                    ...modalRoot.querySelectorAll(scrollTargetSelector),
-                ];
+                const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+                const normalize = value =>
+                    (value || '').replace(/\\s+/g, ' ').trim().toLowerCase();
 
-                const scrollTargets = targetCandidates.filter((node, index, arr) => {
-                    if (!node || arr.indexOf(node) !== index) return false;
-                    return node.scrollHeight > node.clientHeight || node === modalRoot;
-                });
+                const uniqueNodes = nodes => {
+                    const seen = new Set();
+                    return nodes.filter(node => {
+                        if (!node || seen.has(node)) return false;
+                        seen.add(node);
+                        return true;
+                    });
+                };
 
-                for (const target of scrollTargets) {
-                    let stagnant = 0;
-                    for (let i = 0; i < maxScrolls; i++) {
+                const getScrollTargets = root => uniqueNodes([
+                    root,
+                    ...root.querySelectorAll(scrollTargetSelector),
+                ]).filter(node =>
+                    node.scrollHeight > node.clientHeight || node === root
+                );
+
+                const findLoadMoreButton = root => {
+                    const controls = root.querySelectorAll('button, [role="button"]');
+                    for (const control of controls) {
+                        const text = normalize(
+                            control.innerText
+                            || control.textContent
+                            || control.getAttribute('aria-label')
+                        );
+                        if (!text) continue;
+                        if (
+                            text.includes('more reactions')
+                            || text.includes('more reactors')
+                            || text.includes('more people')
+                            || (text.startsWith('see ') && text.includes(' reaction'))
+                        ) {
+                            return control;
+                        }
+                    }
+                    return null;
+                };
+
+                let stagnant = 0;
+                let previousLinkCount = -1;
+
+                for (let round = 0; round < maxRounds; round++) {
+                    const currentModal = document.querySelector(modalSelector);
+                    if (!currentModal) break;
+
+                    let changed = false;
+                    const loadMoreButton = findLoadMoreButton(currentModal);
+                    if (loadMoreButton) {
+                        loadMoreButton.scrollIntoView({ block: 'center' });
+                        loadMoreButton.click();
+                        changed = true;
+                        await sleep(pauseMs);
+                    }
+
+                    for (const target of getScrollTargets(currentModal)) {
                         const prevTop = target.scrollTop;
                         const prevHeight = target.scrollHeight;
                         target.scrollTop = target.scrollHeight;
                         target.dispatchEvent(new Event('scroll', { bubbles: true }));
-                        await new Promise(resolve => setTimeout(resolve, pauseMs));
-                        const sameTop = target.scrollTop === prevTop;
-                        const sameHeight = target.scrollHeight === prevHeight;
-                        if (sameTop && sameHeight) {
-                            stagnant += 1;
-                            if (stagnant >= 2) break;
-                        } else {
-                            stagnant = 0;
+                        await sleep(pauseMs);
+                        if (
+                            target.scrollTop !== prevTop
+                            || target.scrollHeight !== prevHeight
+                        ) {
+                            changed = true;
                         }
+                    }
+
+                    const linkCount = currentModal.querySelectorAll(linkSelector).length;
+                    if (linkCount > previousLinkCount) {
+                        changed = true;
+                        previousLinkCount = linkCount;
+                    }
+
+                    if (changed) {
+                        stagnant = 0;
+                    } else {
+                        stagnant += 1;
+                        if (stagnant >= stagnantRounds) break;
                     }
                 }
             }""",
             {
                 "modalSelector": modal_selector,
                 "scrollTargetSelector": scroll_target_selector,
+                "linkSelector": link_selector,
                 "pauseMs": 900,
-                "maxScrolls": 40,
+                "maxRounds": 60,
+                "stagnantRounds": 3,
             },
         )
 
@@ -773,6 +838,24 @@ class LinkedInExtractor:
                 );
                 if (!modal) return [];
 
+                const normalizeLines = value =>
+                    (value || '')
+                        .replace(/\\u00a0/g, ' ')
+                        .split('\\n')
+                        .map(line => line.trim())
+                        .filter(Boolean);
+
+                const cleanNameCandidate = value => {
+                    for (const line of normalizeLines(value)) {
+                        if (/^view .+ profile$/i.test(line)) continue;
+                        if (/degree connection/i.test(line)) continue;
+                        if (/^\\d+(?:st|nd|rd|th)\\+?$/.test(line)) continue;
+                        if (line === '·') continue;
+                        return line;
+                    }
+                    return '';
+                };
+
                 const results = [];
                 const seen = new Set();
 
@@ -785,14 +868,17 @@ class LinkedInExtractor:
                     if (seen.has(username)) return;
 
                     const textParts = [
+                        link.querySelector('span[aria-hidden="true"]')?.textContent,
                         link.innerText,
                         link.textContent,
                         link.getAttribute('aria-label'),
-                        link.querySelector('span[aria-hidden="true"]')?.textContent,
                         link.querySelector('.update-components-actor__name')?.textContent,
+                        link.closest('li, div, article')?.querySelector('.artdeco-entity-lockup__title')?.textContent,
                         link.closest('li, div, article')?.querySelector('span[dir="ltr"]')?.textContent,
                     ];
-                    const name = (textParts.find(value => (value || '').trim()) || '').trim();
+                    const name = textParts
+                        .map(cleanNameCandidate)
+                        .find(Boolean) || '';
                     if (!name) return;
 
                     seen.add(username);

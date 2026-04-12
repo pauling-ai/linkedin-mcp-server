@@ -510,20 +510,80 @@ class TestPostLikersScraping:
             "https://www.linkedin.com/feed/update/urn:li:activity:123/"
         )
 
+        expansion_call = mock_page.evaluate.await_args_list[0]
+        expansion_script = expansion_call.args[0]
+        expansion_options = expansion_call.args[1]
+        assert "more reactions" in expansion_script
+        assert expansion_options["linkSelector"] == (
+            "a[href*='/in/'], a[data-test-app-aware-link][href*='/in/']"
+        )
+
         extraction_call = mock_page.evaluate.await_args_list[1]
         script = extraction_call.args[0]
         options = extraction_call.args[1]
 
-        assert "link.getAttribute('aria-label')" in script
         assert "span[aria-hidden=\"true\"]" in script
         assert ".update-components-actor__name" in script
+        assert ".artdeco-entity-lockup__title" in script
         assert "span[dir=\"ltr\"]" in script
+        assert "degree connection" in script
         assert options["modalSelector"] == (
             "div[role='dialog'], dialog[open], .artdeco-modal, .artdeco-modal__content"
         )
         assert options["linkSelector"] == (
             "a[href*='/in/'], a[data-test-app-aware-link][href*='/in/']"
         )
+
+    async def test_scrape_post_likers_expands_modal_before_extracting(self, mock_page):
+        extractor = LinkedInExtractor(mock_page)
+        extractor._goto_with_auth_checks = AsyncMock()
+
+        trigger = MagicMock()
+        trigger.is_visible = AsyncMock(return_value=True)
+        trigger.scroll_into_view_if_needed = AsyncMock()
+        trigger.click = AsyncMock()
+
+        trigger_locator = MagicMock()
+        trigger_locator.count = AsyncMock(return_value=1)
+        trigger_locator.nth = MagicMock(return_value=trigger)
+
+        empty_locator = MagicMock()
+        empty_locator.count = AsyncMock(return_value=0)
+
+        def locator_side_effect(selector: str):
+            if selector == "button[data-reaction-details]":
+                return trigger_locator
+            return empty_locator
+
+        mock_page.locator.side_effect = locator_side_effect
+        mock_page.evaluate = AsyncMock(
+            side_effect=[
+                None,
+                [
+                    {
+                        "name": "Julia T.",
+                        "username": "juliat",
+                        "url": "https://www.linkedin.com/in/juliat/",
+                    },
+                    {
+                        "name": "Kevin Ngo",
+                        "username": "kevinngo",
+                        "url": "https://www.linkedin.com/in/kevinngo/",
+                    },
+                ],
+            ]
+        )
+
+        result = await extractor.scrape_post_likers(
+            "https://www.linkedin.com/feed/update/urn:li:activity:123/"
+        )
+
+        assert len(mock_page.evaluate.await_args_list) == 2
+        assert result["count"] == 2
+        assert [liker["name"] for liker in result["likers"]] == [
+            "Julia T.",
+            "Kevin Ngo",
+        ]
 
 
 class TestScrapePersonUrls:
