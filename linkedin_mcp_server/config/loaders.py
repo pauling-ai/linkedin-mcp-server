@@ -48,6 +48,8 @@ class EnvironmentKeys:
     SLOW_MO = "SLOW_MO"
     HUMAN_DELAY_MIN_MS = "HUMAN_DELAY_MIN_MS"
     HUMAN_DELAY_MAX_MS = "HUMAN_DELAY_MAX_MS"
+    LINKEDIN_CALL_DELAY_MS = "LINKEDIN_CALL_DELAY_MS"
+    LINKEDIN_CALL_DELAY_JITTER_MS = "LINKEDIN_CALL_DELAY_JITTER_MS"
     PROJECT_AUTH = "PROJECT_AUTH"
     VIEWPORT = "VIEWPORT"
     CHROME_PATH = "CHROME_PATH"
@@ -155,6 +157,27 @@ def load_from_env(config: AppConfig) -> AppConfig:
                 f"Invalid HUMAN_DELAY_MAX_MS: '{human_delay_max_env}'. Must be an integer."
             )
 
+    if linkedin_call_delay_env := os.environ.get(EnvironmentKeys.LINKEDIN_CALL_DELAY_MS):
+        try:
+            config.browser.linkedin_call_delay_ms = int(linkedin_call_delay_env)
+        except ValueError:
+            raise ConfigurationError(
+                f"Invalid LINKEDIN_CALL_DELAY_MS: '{linkedin_call_delay_env}'. Must be an integer."
+            )
+
+    if linkedin_call_delay_jitter_env := os.environ.get(
+        EnvironmentKeys.LINKEDIN_CALL_DELAY_JITTER_MS
+    ):
+        try:
+            config.browser.linkedin_call_delay_jitter_ms = int(
+                linkedin_call_delay_jitter_env
+            )
+        except ValueError:
+            raise ConfigurationError(
+                "Invalid LINKEDIN_CALL_DELAY_JITTER_MS: "
+                f"'{linkedin_call_delay_jitter_env}'. Must be an integer."
+            )
+
     # Browser viewport (validated in BrowserConfig.validate())
     if viewport_env := os.environ.get(EnvironmentKeys.VIEWPORT):
         try:
@@ -251,6 +274,22 @@ def load_from_args(config: AppConfig) -> AppConfig:
     )
 
     parser.add_argument(
+        "--delay-between-linkedin-calls",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="Baseline delay before each LinkedIn MCP tool call in seconds (default: 1.5)",
+    )
+
+    parser.add_argument(
+        "--delay-jitter",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="Random jitter added/subtracted from the LinkedIn tool-call delay in seconds (default: 0.5)",
+    )
+
+    parser.add_argument(
         "--user-agent",
         type=str,
         default=None,
@@ -342,6 +381,14 @@ def load_from_args(config: AppConfig) -> AppConfig:
 
     if args.human_delay_max_ms is not None:
         config.browser.human_delay_max_ms = args.human_delay_max_ms
+
+    if args.delay_between_linkedin_calls is not None:
+        config.browser.linkedin_call_delay_ms = int(
+            args.delay_between_linkedin_calls * 1000
+        )
+
+    if args.delay_jitter is not None:
+        config.browser.linkedin_call_delay_jitter_ms = int(args.delay_jitter * 1000)
 
     if args.user_agent:
         config.browser.user_agent = args.user_agent

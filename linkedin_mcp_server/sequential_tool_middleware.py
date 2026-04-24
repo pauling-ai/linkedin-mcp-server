@@ -11,6 +11,8 @@ import mcp.types as mt
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.tool import ToolResult
 
+from linkedin_mcp_server.core.utils import sleep_linkedin_call_delay
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +60,19 @@ class SequentialToolExecutionMiddleware(Middleware):
             )
             await self._report_progress(
                 context,
-                message="Scraper lock acquired, starting tool",
+                message="Scraper lock acquired, applying LinkedIn call pacing",
+            )
+            delay_seconds = 0.0
+            if tool_name != "close_session":
+                delay_seconds = await sleep_linkedin_call_delay()
+            logger.debug(
+                "Applied %.3fs LinkedIn call pacing delay before tool '%s'",
+                delay_seconds,
+                tool_name,
+            )
+            await self._report_progress(
+                context,
+                message="LinkedIn call pacing complete, starting tool",
             )
             hold_started = time.perf_counter()
             try:

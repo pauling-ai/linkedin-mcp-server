@@ -15,6 +15,8 @@ class TestBrowserConfig:
         assert config.default_timeout == 5000
         assert config.human_delay_min_ms == 500
         assert config.human_delay_max_ms == 2000
+        assert config.linkedin_call_delay_ms == 1500
+        assert config.linkedin_call_delay_jitter_ms == 500
         assert config.user_data_dir == "~/.linkedin-mcp/profile"
 
     def test_validate_passes(self):
@@ -35,6 +37,14 @@ class TestBrowserConfig:
     def test_validate_human_delay_max_below_min(self):
         with pytest.raises(ConfigurationError):
             BrowserConfig(human_delay_min_ms=1000, human_delay_max_ms=500).validate()
+
+    def test_validate_negative_linkedin_call_delay(self):
+        with pytest.raises(ConfigurationError):
+            BrowserConfig(linkedin_call_delay_ms=-1).validate()
+
+    def test_validate_negative_linkedin_call_delay_jitter(self):
+        with pytest.raises(ConfigurationError):
+            BrowserConfig(linkedin_call_delay_jitter_ms=-1).validate()
 
 
 class TestServerConfig:
@@ -173,6 +183,36 @@ class TestLoaders:
         with pytest.raises(ConfigurationError, match="Invalid HUMAN_DELAY_MAX_MS"):
             load_from_env(AppConfig())
 
+    def test_load_from_env_linkedin_call_delay_ms(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CALL_DELAY_MS", "1200")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.linkedin_call_delay_ms == 1200
+
+    def test_load_from_env_linkedin_call_delay_jitter_ms(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CALL_DELAY_JITTER_MS", "300")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.linkedin_call_delay_jitter_ms == 300
+
+    def test_load_from_env_invalid_linkedin_call_delay_ms(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CALL_DELAY_MS", "invalid")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        with pytest.raises(ConfigurationError, match="Invalid LINKEDIN_CALL_DELAY_MS"):
+            load_from_env(AppConfig())
+
+    def test_load_from_env_invalid_linkedin_call_delay_jitter_ms(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CALL_DELAY_JITTER_MS", "invalid")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        with pytest.raises(
+            ConfigurationError, match="Invalid LINKEDIN_CALL_DELAY_JITTER_MS"
+        ):
+            load_from_env(AppConfig())
+
     def test_load_from_env_viewport(self, monkeypatch):
         monkeypatch.setenv("VIEWPORT", "1920x1080")
         from linkedin_mcp_server.config.loaders import load_from_env
@@ -223,3 +263,20 @@ class TestLoaders:
 
         config = load_from_args(AppConfig())
         assert config.browser.user_data_dir == PROJECT_AUTH_USER_DATA_DIR
+
+    def test_load_from_args_linkedin_call_delay_seconds(self, monkeypatch):
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "linkedin-mcp-server",
+                "--delay-between-linkedin-calls",
+                "1.25",
+                "--delay-jitter",
+                "0.25",
+            ],
+        )
+        from linkedin_mcp_server.config.loaders import load_from_args
+
+        config = load_from_args(AppConfig())
+        assert config.browser.linkedin_call_delay_ms == 1250
+        assert config.browser.linkedin_call_delay_jitter_ms == 250

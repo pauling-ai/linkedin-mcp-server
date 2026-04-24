@@ -19,10 +19,28 @@ def get_human_delay_seconds() -> float:
     return random.uniform(minimum, maximum)
 
 
+def get_linkedin_call_delay_seconds() -> float:
+    """Return randomized pacing delay before a LinkedIn MCP tool call."""
+    browser = get_config().browser
+    baseline = browser.linkedin_call_delay_ms / 1000
+    jitter = browser.linkedin_call_delay_jitter_ms / 1000
+    minimum = max(0.0, baseline - jitter)
+    maximum = baseline + jitter
+    return random.uniform(minimum, maximum)
+
+
 async def sleep_human_delay() -> float:
     """Sleep for a randomized human-like delay and return the chosen duration."""
     delay = get_human_delay_seconds()
     await asyncio.sleep(delay)
+    return delay
+
+
+async def sleep_linkedin_call_delay() -> float:
+    """Sleep before a LinkedIn MCP tool call and return the chosen duration."""
+    delay = get_linkedin_call_delay_seconds()
+    if delay > 0:
+        await asyncio.sleep(delay)
     return delay
 
 

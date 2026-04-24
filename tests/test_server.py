@@ -20,7 +20,13 @@ class TestSequentialToolExecutionMiddleware:
             for middleware in mcp.middleware
         )
 
-    async def test_sequential_tool_middleware_serializes_parallel_tool_calls(self):
+    async def test_sequential_tool_middleware_serializes_parallel_tool_calls(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "linkedin_mcp_server.sequential_tool_middleware.sleep_linkedin_call_delay",
+            AsyncMock(return_value=0.0),
+        )
         mcp = FastMCP("test")
         mcp.add_middleware(SequentialToolExecutionMiddleware())
 
@@ -47,7 +53,11 @@ class TestSequentialToolExecutionMiddleware:
         assert result_one.structured_content == {"delay": 0.05}
         assert result_two.structured_content == {"delay": 0.05}
 
-    async def test_sequential_tool_middleware_preserves_tool_results(self):
+    async def test_sequential_tool_middleware_preserves_tool_results(self, monkeypatch):
+        monkeypatch.setattr(
+            "linkedin_mcp_server.sequential_tool_middleware.sleep_linkedin_call_delay",
+            AsyncMock(return_value=0.0),
+        )
         mcp = FastMCP("test")
         mcp.add_middleware(SequentialToolExecutionMiddleware())
 
@@ -59,7 +69,12 @@ class TestSequentialToolExecutionMiddleware:
 
         assert result.structured_content == {"value": 7}
 
-    async def test_sequential_tool_middleware_reports_queue_progress(self):
+    async def test_sequential_tool_middleware_reports_queue_progress(self, monkeypatch):
+        sleep_mock = AsyncMock(return_value=1.25)
+        monkeypatch.setattr(
+            "linkedin_mcp_server.sequential_tool_middleware.sleep_linkedin_call_delay",
+            sleep_mock,
+        )
         middleware = SequentialToolExecutionMiddleware()
         fastmcp_context = MagicMock()
         fastmcp_context.request_context = object()
@@ -83,7 +98,33 @@ class TestSequentialToolExecutionMiddleware:
                 call(
                     progress=0,
                     total=100,
-                    message="Scraper lock acquired, starting tool",
+                    message="Scraper lock acquired, applying LinkedIn call pacing",
+                ),
+                call(
+                    progress=0,
+                    total=100,
+                    message="LinkedIn call pacing complete, starting tool",
                 ),
             ]
         )
+        sleep_mock.assert_awaited_once()
+
+    async def test_sequential_tool_middleware_skips_pacing_for_close_session(
+        self, monkeypatch
+    ):
+        sleep_mock = AsyncMock(return_value=1.25)
+        monkeypatch.setattr(
+            "linkedin_mcp_server.sequential_tool_middleware.sleep_linkedin_call_delay",
+            sleep_mock,
+        )
+        middleware = SequentialToolExecutionMiddleware()
+        call_next = AsyncMock(return_value=MagicMock())
+        context = MiddlewareContext(
+            message=mt.CallToolRequestParams(name="close_session", arguments={}),
+            method="tools/call",
+            fastmcp_context=None,
+        )
+
+        await middleware.on_call_tool(context, call_next)
+
+        sleep_mock.assert_not_awaited()

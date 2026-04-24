@@ -125,7 +125,7 @@ After installing (either in a project venv or globally), add to your `.mcp.json`
   "mcpServers": {
     "linkedin": {
       "command": "/path/to/venv/bin/linkedin-scraper-mcp",
-      "args": ["--project-auth", "--human-delay-min-ms", "500", "--human-delay-max-ms", "2000"],
+      "args": ["--project-auth", "--delay-between-linkedin-calls", "1.5", "--delay-jitter", "0.5"],
       "env": {
         "LOG_LEVEL": "INFO"
       }
@@ -141,7 +141,7 @@ Or run directly from the repo with `uv` (no install needed):
   "mcpServers": {
     "linkedin": {
       "command": "uv",
-      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server", "--project-auth", "--human-delay-min-ms", "500", "--human-delay-max-ms", "2000"],
+      "args": ["--directory", "/path/to/linkedin-mcp-server", "run", "-m", "linkedin_mcp_server", "--project-auth", "--delay-between-linkedin-calls", "1.5", "--delay-jitter", "0.5"],
       "env": {
         "LOG_LEVEL": "INFO"
       }
@@ -152,7 +152,7 @@ Or run directly from the repo with `uv` (no install needed):
 
 The `uv` approach is the simplest — just update the `--directory` path and you're done.
 
-Use `--slow-mo` only when debugging or when you want to watch browser actions happen more slowly. For LinkedIn-facing pacing, prefer `--human-delay-min-ms` / `--human-delay-max-ms`, which add randomized waits around the request-driving actions instead of slowing every browser operation uniformly.
+Use `--slow-mo` only when debugging or when you want to watch browser actions happen more slowly. For LinkedIn-facing pacing between tool calls, prefer `--delay-between-linkedin-calls` / `--delay-jitter`. The smaller `--human-delay-min-ms` / `--human-delay-max-ms` settings still control waits inside individual browser workflows.
 
 If you want a separate LinkedIn account per repo on the same machine, start the server with `--project-auth`. That stores the auth state under the current project in `.linkedin-mcp-server/` instead of the shared `~/.linkedin-mcp/` location.
 
@@ -166,6 +166,8 @@ If you want a separate LinkedIn account per repo on the same machine, start the 
 - `--slow-mo MS` - Debugging aid: slows all browser actions uniformly in ms (default: 0)
 - `--human-delay-min-ms MS` - Minimum randomized delay between LinkedIn actions (default: 500)
 - `--human-delay-max-ms MS` - Maximum randomized delay between LinkedIn actions (default: 2000)
+- `--delay-between-linkedin-calls SECONDS` - Baseline delay before each LinkedIn MCP tool call (default: 1.5)
+- `--delay-jitter SECONDS` - Random jitter added/subtracted from tool-call delay (default: 0.5)
 - `--log-level {DEBUG,INFO,WARNING,ERROR}` - Logging level (default: WARNING)
 - `--timeout MS` - Browser timeout for page operations in ms (default: 5000)
 - `--transport {stdio,streamable-http}` - Transport mode (default: stdio)
@@ -180,9 +182,11 @@ If you want a separate LinkedIn account per repo on the same machine, start the 
 
 **Timeout issues:** Increase with `--timeout 10000` or env var `TIMEOUT=10000`.
 
-**Human-like pacing:** Tune with `--human-delay-min-ms` / `--human-delay-max-ms` or env vars `HUMAN_DELAY_MIN_MS` / `HUMAN_DELAY_MAX_MS`. These affect the effective LinkedIn request cadence.
+**Tool-call pacing:** Tune with `--delay-between-linkedin-calls` / `--delay-jitter` or env vars `LINKEDIN_CALL_DELAY_MS` / `LINKEDIN_CALL_DELAY_JITTER_MS`. Defaults are `1.5 ± 0.5` seconds, so each LinkedIn MCP tool call starts after roughly 1-2 seconds.
 
-**`slow_mo` vs human delay:** `--slow-mo` / `SLOW_MO` is mainly for debugging because it slows nearly every browser action. The human-delay settings are the better choice for production pacing. In most cases you should use one or the other, not both.
+**In-tool pacing:** Tune with `--human-delay-min-ms` / `--human-delay-max-ms` or env vars `HUMAN_DELAY_MIN_MS` / `HUMAN_DELAY_MAX_MS`. These are smaller pauses inside a tool workflow, e.g. after navigation or clicks.
+
+**`slow_mo` vs pacing delays:** `--slow-mo` / `SLOW_MO` is mainly for debugging because it slows nearly every browser action. Prefer the tool-call and in-tool pacing settings for normal runs.
 
 **Per-project LinkedIn accounts:** Use `--project-auth` or env var `PROJECT_AUTH=true`. The login flow will then create:
 

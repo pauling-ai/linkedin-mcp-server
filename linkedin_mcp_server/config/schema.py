@@ -26,6 +26,8 @@ class BrowserConfig:
     default_timeout: int = 5000  # Milliseconds for page operations
     human_delay_min_ms: int = 500  # Minimum randomized delay between actions
     human_delay_max_ms: int = 2000  # Maximum randomized delay between actions
+    linkedin_call_delay_ms: int = 1500  # Baseline delay before each LinkedIn MCP tool call
+    linkedin_call_delay_jitter_ms: int = 500  # Random jitter added/subtracted from baseline
     chrome_path: str | None = None  # Path to Chrome/Chromium executable
     user_data_dir: str = "~/.linkedin-mcp/profile"  # Persistent browser profile
 
@@ -47,6 +49,15 @@ class BrowserConfig:
             raise ConfigurationError(
                 "human_delay_max_ms must be greater than or equal to "
                 f"human_delay_min_ms, got {self.human_delay_max_ms} < {self.human_delay_min_ms}"
+            )
+        if self.linkedin_call_delay_ms < 0:
+            raise ConfigurationError(
+                f"linkedin_call_delay_ms must be non-negative, got {self.linkedin_call_delay_ms}"
+            )
+        if self.linkedin_call_delay_jitter_ms < 0:
+            raise ConfigurationError(
+                "linkedin_call_delay_jitter_ms must be non-negative, got "
+                f"{self.linkedin_call_delay_jitter_ms}"
             )
         if self.viewport_width <= 0 or self.viewport_height <= 0:
             raise ConfigurationError(
