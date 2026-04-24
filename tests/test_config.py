@@ -17,6 +17,9 @@ class TestBrowserConfig:
         assert config.human_delay_max_ms == 2000
         assert config.linkedin_call_delay_ms == 1500
         assert config.linkedin_call_delay_jitter_ms == 500
+        assert config.linkedin_cache_dir is None
+        assert config.linkedin_cache_disabled is False
+        assert config.profile_cache_ttl_hours == 720
         assert config.user_data_dir == "~/.linkedin-mcp/profile"
 
     def test_validate_passes(self):
@@ -45,6 +48,10 @@ class TestBrowserConfig:
     def test_validate_negative_linkedin_call_delay_jitter(self):
         with pytest.raises(ConfigurationError):
             BrowserConfig(linkedin_call_delay_jitter_ms=-1).validate()
+
+    def test_validate_negative_profile_cache_ttl(self):
+        with pytest.raises(ConfigurationError):
+            BrowserConfig(profile_cache_ttl_hours=-1).validate()
 
 
 class TestServerConfig:
@@ -213,6 +220,36 @@ class TestLoaders:
         ):
             load_from_env(AppConfig())
 
+    def test_load_from_env_linkedin_cache_dir(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CACHE_DIR", "/tmp/linkedin-cache")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.linkedin_cache_dir == "/tmp/linkedin-cache"
+
+    def test_load_from_env_linkedin_cache_disabled(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_CACHE_DISABLED", "true")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.linkedin_cache_disabled is True
+
+    def test_load_from_env_profile_cache_ttl_hours(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_PROFILE_CACHE_TTL_HOURS", "168")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        config = load_from_env(AppConfig())
+        assert config.browser.profile_cache_ttl_hours == 168
+
+    def test_load_from_env_invalid_profile_cache_ttl_hours(self, monkeypatch):
+        monkeypatch.setenv("LINKEDIN_PROFILE_CACHE_TTL_HOURS", "invalid")
+        from linkedin_mcp_server.config.loaders import load_from_env
+
+        with pytest.raises(
+            ConfigurationError, match="Invalid LINKEDIN_PROFILE_CACHE_TTL_HOURS"
+        ):
+            load_from_env(AppConfig())
+
     def test_load_from_env_viewport(self, monkeypatch):
         monkeypatch.setenv("VIEWPORT", "1920x1080")
         from linkedin_mcp_server.config.loaders import load_from_env
@@ -280,3 +317,22 @@ class TestLoaders:
         config = load_from_args(AppConfig())
         assert config.browser.linkedin_call_delay_ms == 1250
         assert config.browser.linkedin_call_delay_jitter_ms == 250
+
+    def test_load_from_args_linkedin_cache_options(self, monkeypatch):
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "linkedin-mcp-server",
+                "--linkedin-cache-dir",
+                "/tmp/linkedin-cache",
+                "--disable-linkedin-cache",
+                "--profile-cache-ttl-hours",
+                "168",
+            ],
+        )
+        from linkedin_mcp_server.config.loaders import load_from_args
+
+        config = load_from_args(AppConfig())
+        assert config.browser.linkedin_cache_dir == "/tmp/linkedin-cache"
+        assert config.browser.linkedin_cache_disabled is True
+        assert config.browser.profile_cache_ttl_hours == 168

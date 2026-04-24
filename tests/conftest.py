@@ -15,6 +15,12 @@ def reset_singletons():
 
 
 @pytest.fixture(autouse=True)
+def isolate_cli_args(monkeypatch):
+    """Prevent config loading from parsing pytest's own command-line args."""
+    monkeypatch.setattr("sys.argv", ["linkedin-mcp-server"])
+
+
+@pytest.fixture(autouse=True)
 def isolate_profile_dir(tmp_path, monkeypatch):
     """Redirect profile directory to tmp_path via config and DEFAULT_PROFILE_DIR."""
     fake_profile = tmp_path / "profile"

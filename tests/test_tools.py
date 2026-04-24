@@ -84,6 +84,7 @@ class TestPersonTool:
         assert "main_profile" in result["sections"]
         assert "pages_visited" not in result
         assert "sections_requested" not in result
+        assert result["cached"] is False
 
     async def test_get_person_profile_with_sections(self, mock_context):
         """Verify sections parameter is passed through."""
@@ -156,6 +157,66 @@ class TestPersonTool:
         tool_fn = await get_tool_fn(mcp, "get_person_profile")
         with pytest.raises(ToolError, match="Session expired"):
             await tool_fn("test-user", mock_context, extractor=mock_extractor)
+
+    async def test_get_person_profile_uses_fresh_cache(self, mock_context):
+        cached_raw = {
+            "url": "https://www.linkedin.com/in/test-user/",
+            "sections": {"main_profile": "Cached Person"},
+        }
+        mock_extractor = _make_mock_extractor(
+            {
+                "url": "https://www.linkedin.com/in/test-user/",
+                "sections": {"main_profile": "Fresh Person"},
+            }
+        )
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_person_profile")
+
+        with patch(
+            "linkedin_mcp_server.tools.person.read_cached_profile",
+            return_value=(cached_raw, {"cached": True, "cached_at": "2026-04-24T00:00:00+00:00"}),
+        ):
+            result = await tool_fn("test-user", mock_context, extractor=mock_extractor)
+
+        assert result["sections"]["main_profile"] == "Cached Person"
+        assert result["cached"] is True
+        mock_extractor.scrape_person.assert_not_awaited()
+
+    async def test_get_person_profile_force_refresh_bypasses_cache(self, mock_context):
+        expected = {
+            "url": "https://www.linkedin.com/in/test-user/",
+            "sections": {"main_profile": "Fresh Person"},
+        }
+        mock_extractor = _make_mock_extractor(expected)
+
+        from linkedin_mcp_server.tools.person import register_person_tools
+
+        mcp = FastMCP("test")
+        register_person_tools(mcp)
+        tool_fn = await get_tool_fn(mcp, "get_person_profile")
+
+        with (
+            patch(
+                "linkedin_mcp_server.tools.person.read_cached_profile",
+                return_value=({"sections": {"main_profile": "Cached Person"}}, {"cached": True}),
+            ) as read_cache,
+            patch("linkedin_mcp_server.tools.person.write_cached_profile", return_value=None),
+        ):
+            result = await tool_fn(
+                "test-user",
+                mock_context,
+                force_refresh=True,
+                extractor=mock_extractor,
+            )
+
+        assert result["sections"]["main_profile"] == "Fresh Person"
+        assert result["cached"] is False
+        read_cache.assert_not_called()
+        mock_extractor.scrape_person.assert_awaited_once()
 
     async def test_get_person_profile_auth_error(self, monkeypatch):
         """Auth failures in the DI layer produce proper ToolError responses."""

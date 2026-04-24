@@ -102,7 +102,17 @@ def format_tool_output(
 
     # Carry through small metadata keys that are useful without reading
     # the file.  These are already tiny relative to sections/text.
-    for key in ("url", "count", "job_ids", "post_urns", "unknown_sections"):
+    for key in (
+        "url",
+        "count",
+        "job_ids",
+        "post_urns",
+        "unknown_sections",
+        "cached",
+        "cached_at",
+        "cache_age_seconds",
+        "cache_path",
+    ):
         if key in result:
             summary[key] = result[key]
 

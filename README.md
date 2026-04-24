@@ -168,6 +168,9 @@ If you want a separate LinkedIn account per repo on the same machine, start the 
 - `--human-delay-max-ms MS` - Maximum randomized delay between LinkedIn actions (default: 2000)
 - `--delay-between-linkedin-calls SECONDS` - Baseline delay before each LinkedIn MCP tool call (default: 1.5)
 - `--delay-jitter SECONDS` - Random jitter added/subtracted from tool-call delay (default: 0.5)
+- `--linkedin-cache-dir PATH` - Override cache root (default: beside auth profile)
+- `--disable-linkedin-cache` - Disable LinkedIn tool result caching
+- `--profile-cache-ttl-hours HOURS` - TTL for cached person profiles (default: 720 / 30 days)
 - `--log-level {DEBUG,INFO,WARNING,ERROR}` - Logging level (default: WARNING)
 - `--timeout MS` - Browser timeout for page operations in ms (default: 5000)
 - `--transport {stdio,streamable-http}` - Transport mode (default: stdio)
@@ -185,6 +188,8 @@ If you want a separate LinkedIn account per repo on the same machine, start the 
 **Tool-call pacing:** Tune with `--delay-between-linkedin-calls` / `--delay-jitter` or env vars `LINKEDIN_CALL_DELAY_MS` / `LINKEDIN_CALL_DELAY_JITTER_MS`. Defaults are `1.5 ± 0.5` seconds, so each LinkedIn MCP tool call starts after roughly 1-2 seconds.
 
 **In-tool pacing:** Tune with `--human-delay-min-ms` / `--human-delay-max-ms` or env vars `HUMAN_DELAY_MIN_MS` / `HUMAN_DELAY_MAX_MS`. These are smaller pauses inside a tool workflow, e.g. after navigation or clicks.
+
+**Profile caching:** `get_person_profile` caches raw profile scrape results for 720 hours by default. The cache is shared across sessions beside the auth profile: `~/.linkedin-mcp/cache/profiles/` by default, or `.linkedin-mcp-server/cache/profiles/` when using `--project-auth`. Use `force_refresh=true` on the tool call to bypass cache for one profile. Requests that include the `posts` section are not cached, so competitor post discovery stays fresh. Use `--profile-cache-ttl-hours`, `--linkedin-cache-dir`, or `--disable-linkedin-cache` to tune globally. Env vars: `LINKEDIN_PROFILE_CACHE_TTL_HOURS`, `LINKEDIN_CACHE_DIR`, `LINKEDIN_CACHE_DISABLED`.
 
 **`slow_mo` vs pacing delays:** `--slow-mo` / `SLOW_MO` is mainly for debugging because it slows nearly every browser action. Prefer the tool-call and in-tool pacing settings for normal runs.
 

@@ -28,6 +28,9 @@ class BrowserConfig:
     human_delay_max_ms: int = 2000  # Maximum randomized delay between actions
     linkedin_call_delay_ms: int = 1500  # Baseline delay before each LinkedIn MCP tool call
     linkedin_call_delay_jitter_ms: int = 500  # Random jitter added/subtracted from baseline
+    linkedin_cache_dir: str | None = None  # Cache root override; defaults beside user_data_dir
+    linkedin_cache_disabled: bool = False
+    profile_cache_ttl_hours: int = 720  # 30 days
     chrome_path: str | None = None  # Path to Chrome/Chromium executable
     user_data_dir: str = "~/.linkedin-mcp/profile"  # Persistent browser profile
 
@@ -58,6 +61,10 @@ class BrowserConfig:
             raise ConfigurationError(
                 "linkedin_call_delay_jitter_ms must be non-negative, got "
                 f"{self.linkedin_call_delay_jitter_ms}"
+            )
+        if self.profile_cache_ttl_hours < 0:
+            raise ConfigurationError(
+                f"profile_cache_ttl_hours must be non-negative, got {self.profile_cache_ttl_hours}"
             )
         if self.viewport_width <= 0 or self.viewport_height <= 0:
             raise ConfigurationError(

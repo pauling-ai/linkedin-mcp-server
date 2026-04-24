@@ -12,6 +12,7 @@ from typing import Any, Literal
 from fastmcp import Context, FastMCP
 from fastmcp.dependencies import Depends
 
+from linkedin_mcp_server.cache import read_cached_profile, write_cached_profile
 from linkedin_mcp_server.constants import TOOL_TIMEOUT_SECONDS
 from linkedin_mcp_server.core.utils import sleep_human_delay
 from linkedin_mcp_server.dependencies import get_extractor
@@ -37,6 +38,7 @@ def register_person_tools(mcp: FastMCP) -> None:
         sections: str | None = None,
         detail: Literal["basic", "full"] = "basic",
         output: Literal["inline", "file"] = "inline",
+        force_refresh: bool = False,
         extractor: LinkedInExtractor = Depends(get_extractor),
     ) -> dict[str, Any]:
         """
@@ -77,6 +79,7 @@ def register_person_tools(mcp: FastMCP) -> None:
                     window on large text blobs that may only need to be stored.
                     The caller can read the file later if deeper analysis is
                     needed.
+            force_refresh: If true, bypass cached profile data and fetch from LinkedIn.
 
         Returns:
             When output="inline":
@@ -103,8 +106,19 @@ def register_person_tools(mcp: FastMCP) -> None:
                 progress=0, total=100, message="Starting person profile scrape"
             )
 
-            result = await extractor.scrape_person(linkedin_username, requested)
-            result = apply_detail_filter(result, detail)
+            cached = None if force_refresh else read_cached_profile(linkedin_username, requested)
+            if cached is not None:
+                raw_result, cache_metadata = cached
+                result = apply_detail_filter(raw_result, detail)
+                result.update(cache_metadata)
+            else:
+                raw_result = await extractor.scrape_person(linkedin_username, requested)
+                cache_path = write_cached_profile(linkedin_username, requested, raw_result)
+                result = apply_detail_filter(raw_result, detail)
+                result["cached"] = False
+                if cache_path is not None:
+                    result["cache_path"] = str(cache_path)
+
 
             if unknown:
                 result["unknown_sections"] = unknown

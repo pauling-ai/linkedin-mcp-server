@@ -34,6 +34,14 @@ def positive_int(value: str) -> int:
     return ivalue
 
 
+def non_negative_int(value: str) -> int:
+    """Argparse type for non-negative integers."""
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"must be non-negative, got {value}")
+    return ivalue
+
+
 class EnvironmentKeys:
     """Environment variable names used by the application."""
 
@@ -50,6 +58,9 @@ class EnvironmentKeys:
     HUMAN_DELAY_MAX_MS = "HUMAN_DELAY_MAX_MS"
     LINKEDIN_CALL_DELAY_MS = "LINKEDIN_CALL_DELAY_MS"
     LINKEDIN_CALL_DELAY_JITTER_MS = "LINKEDIN_CALL_DELAY_JITTER_MS"
+    LINKEDIN_CACHE_DIR = "LINKEDIN_CACHE_DIR"
+    LINKEDIN_CACHE_DISABLED = "LINKEDIN_CACHE_DISABLED"
+    LINKEDIN_PROFILE_CACHE_TTL_HOURS = "LINKEDIN_PROFILE_CACHE_TTL_HOURS"
     PROJECT_AUTH = "PROJECT_AUTH"
     VIEWPORT = "VIEWPORT"
     CHROME_PATH = "CHROME_PATH"
@@ -178,6 +189,25 @@ def load_from_env(config: AppConfig) -> AppConfig:
                 f"'{linkedin_call_delay_jitter_env}'. Must be an integer."
             )
 
+    if cache_dir_env := os.environ.get(EnvironmentKeys.LINKEDIN_CACHE_DIR):
+        config.browser.linkedin_cache_dir = cache_dir_env
+
+    if os.environ.get(EnvironmentKeys.LINKEDIN_CACHE_DISABLED) in TRUTHY_VALUES:
+        config.browser.linkedin_cache_disabled = True
+    elif os.environ.get(EnvironmentKeys.LINKEDIN_CACHE_DISABLED) in FALSY_VALUES:
+        config.browser.linkedin_cache_disabled = False
+
+    if profile_cache_ttl_env := os.environ.get(
+        EnvironmentKeys.LINKEDIN_PROFILE_CACHE_TTL_HOURS
+    ):
+        try:
+            config.browser.profile_cache_ttl_hours = int(profile_cache_ttl_env)
+        except ValueError:
+            raise ConfigurationError(
+                "Invalid LINKEDIN_PROFILE_CACHE_TTL_HOURS: "
+                f"'{profile_cache_ttl_env}'. Must be an integer."
+            )
+
     # Browser viewport (validated in BrowserConfig.validate())
     if viewport_env := os.environ.get(EnvironmentKeys.VIEWPORT):
         try:
@@ -290,6 +320,28 @@ def load_from_args(config: AppConfig) -> AppConfig:
     )
 
     parser.add_argument(
+        "--linkedin-cache-dir",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Cache root for LinkedIn tool data (default: beside auth profile)",
+    )
+
+    parser.add_argument(
+        "--disable-linkedin-cache",
+        action="store_true",
+        help="Disable LinkedIn tool result caching",
+    )
+
+    parser.add_argument(
+        "--profile-cache-ttl-hours",
+        type=non_negative_int,
+        default=None,
+        metavar="HOURS",
+        help="TTL for cached person profiles in hours (default: 720)",
+    )
+
+    parser.add_argument(
         "--user-agent",
         type=str,
         default=None,
@@ -389,6 +441,15 @@ def load_from_args(config: AppConfig) -> AppConfig:
 
     if args.delay_jitter is not None:
         config.browser.linkedin_call_delay_jitter_ms = int(args.delay_jitter * 1000)
+
+    if args.linkedin_cache_dir:
+        config.browser.linkedin_cache_dir = args.linkedin_cache_dir
+
+    if args.disable_linkedin_cache:
+        config.browser.linkedin_cache_disabled = True
+
+    if args.profile_cache_ttl_hours is not None:
+        config.browser.profile_cache_ttl_hours = args.profile_cache_ttl_hours
 
     if args.user_agent:
         config.browser.user_agent = args.user_agent
